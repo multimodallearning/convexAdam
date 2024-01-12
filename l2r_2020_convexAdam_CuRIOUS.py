@@ -4,16 +4,13 @@
 # In[1]:
 
 
-from scipy.ndimage.interpolation import map_coordinates, zoom
-
 import numpy as np
 
 import numpy as np
 import nibabel as nib
 import struct
 import scipy.ndimage
-from scipy.ndimage.interpolation import zoom as zoom
-from scipy.ndimage.interpolation import map_coordinates
+from scipy.ndimage import map_coordinates, zoom
 
 import torch
 import torch.nn as nn
