@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from scipy.ndimage.interpolation import zoom as zoom
+from scipy.ndimage import zoom as zoom
 from scipy.ndimage import distance_transform_edt as edt
 from convex_adam_utils import *
 import time
