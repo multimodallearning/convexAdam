@@ -5,53 +5,15 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from scipy.ndimage import distance_transform_edt as edt
 from scipy.ndimage import zoom as zoom
 
-from convexAdam.convex_adam_utils import (MINDSSC, correlate, coupled_convex,
+from convexAdam.convex_adam_MIND import extract_features
+from convexAdam.convex_adam_utils import (correlate, coupled_convex,
                                           inverse_consistency)
 
 warnings.filterwarnings("ignore")
 
 
-# extract MIND and/or semantic nnUNet features
-def extract_features(img_fixed,
-                    img_moving,
-                    mind_r,
-                    mind_d,
-                    use_mask,
-                    mask_fixed,
-                    mask_moving):
-
-    # MIND features
-    if use_mask:
-        H,W,D = img_fixed.shape[-3:]
-
-        #replicate masking
-        avg3 = nn.Sequential(nn.ReplicationPad3d(1),nn.AvgPool3d(3,stride=1))
-        avg3.cuda()
-        
-        mask = (avg3(mask_fixed.view(1,1,H,W,D).cuda())>0.9).float()
-        _,idx = edt((mask[0,0,::2,::2,::2]==0).squeeze().cpu().numpy(),return_indices=True)
-        fixed_r = F.interpolate((img_fixed[::2,::2,::2].cuda().reshape(-1)[idx[0]*D//2*W//2+idx[1]*D//2+idx[2]]).unsqueeze(0).unsqueeze(0),scale_factor=2,mode='trilinear')
-        fixed_r.view(-1)[mask.view(-1)!=0] = img_fixed.cuda().reshape(-1)[mask.view(-1)!=0]
-
-        mask = (avg3(mask_moving.view(1,1,H,W,D).cuda())>0.9).float()
-        _,idx = edt((mask[0,0,::2,::2,::2]==0).squeeze().cpu().numpy(),return_indices=True)
-        moving_r = F.interpolate((img_moving[::2,::2,::2].cuda().reshape(-1)[idx[0]*D//2*W//2+idx[1]*D//2+idx[2]]).unsqueeze(0).unsqueeze(0),scale_factor=2,mode='trilinear')
-        moving_r.view(-1)[mask.view(-1)!=0] = img_moving.cuda().reshape(-1)[mask.view(-1)!=0]
-
-        features_fix = MINDSSC(fixed_r.cuda(),mind_r,mind_d).half()
-        features_mov = MINDSSC(moving_r.cuda(),mind_r,mind_d).half()
-    else:
-        img_fixed = img_fixed.unsqueeze(0).unsqueeze(0)
-        img_moving = img_moving.unsqueeze(0).unsqueeze(0)
-        features_fix = MINDSSC(img_fixed.cuda(),mind_r,mind_d).half()
-        features_mov = MINDSSC(img_moving.cuda(),mind_r,mind_d).half()
-    
-    #print('features_fix',features_fix.shape)
-    #print('features_mov',features_mov.shape)
-    return features_fix, features_mov
 
 # coupled convex optimisation with adam instance optimisation
 def convex_adam(img_fixed,
