@@ -1,16 +1,21 @@
+import argparse
+import os
+import time
+import warnings
+from pathlib import Path
+from typing import Optional, Union
+
+import nibabel as nib
+import numpy as np
+import SimpleITK as sitk
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-from scipy.ndimage.interpolation import zoom as zoom
 from scipy.ndimage import distance_transform_edt as edt
-from convex_adam_utils import *
-import time
-import argparse
-import nibabel as nib
-import os
 
-import warnings
+from convex_adam_utils import (MINDSSC, correlate, coupled_convex,
+                               inverse_consistency)
+
 warnings.filterwarnings("ignore")
 
 
@@ -74,18 +79,18 @@ def convex_adam(path_img_fixed,
     if use_mask:
         mask_fixed = torch.from_numpy(nib.load(path_fixed_mask).get_fdata()).float()
         mask_moving = torch.from_numpy(nib.load(path_moving_mask).get_fdata()).float()
-    else: 
+    else:
         mask_fixed = None
         mask_moving = None
-    
-    H,W,D = img_fixed.shape
+
+    H, W, D = img_fixed.shape
 
     torch.cuda.synchronize()
     t0 = time.time()
 
-    #compute features and downsample (using average pooling)
+    # compute features and downsample (using average pooling)
     with torch.no_grad():      
-        
+
         features_fix, features_mov = extract_features(img_fixed=img_fixed,
                                                         img_moving=img_moving,
                                                         mind_r=mind_r,
@@ -96,7 +101,7 @@ def convex_adam(path_img_fixed,
         
         features_fix_smooth = F.avg_pool3d(features_fix,grid_sp,stride=grid_sp)
         features_mov_smooth = F.avg_pool3d(features_mov,grid_sp,stride=grid_sp)
-        
+
         n_ch = features_fix_smooth.shape[1]
 
     # compute correlation volume with SSD
@@ -125,10 +130,8 @@ def convex_adam(path_img_fixed,
     # run Adam instance optimisation
     if lambda_weight > 0:
         with torch.no_grad():
-
             patch_features_fix = F.avg_pool3d(features_fix,grid_sp_adam,stride=grid_sp_adam)
             patch_features_mov = F.avg_pool3d(features_mov,grid_sp_adam,stride=grid_sp_adam)
-
 
         #create optimisable displacement grid
         disp_lr = F.interpolate(disp_hr,size=(H//grid_sp_adam,W//grid_sp_adam,D//grid_sp_adam),mode='trilinear',align_corners=False)
@@ -166,12 +169,12 @@ def convex_adam(path_img_fixed,
             kernel_smooth = 5
             padding_smooth = kernel_smooth//2
             disp_hr = F.avg_pool3d(F.avg_pool3d(F.avg_pool3d(disp_hr,kernel_smooth,padding=padding_smooth,stride=1),kernel_smooth,padding=padding_smooth,stride=1),kernel_smooth,padding=padding_smooth,stride=1)
-            
+
         if selected_smooth == 3:
             kernel_smooth = 3
             padding_smooth = kernel_smooth//2
             disp_hr = F.avg_pool3d(F.avg_pool3d(F.avg_pool3d(disp_hr,kernel_smooth,padding=padding_smooth,stride=1),kernel_smooth,padding=padding_smooth,stride=1),kernel_smooth,padding=padding_smooth,stride=1)
-            
+
     torch.cuda.synchronize()
     t1 = time.time()
     case_time = t1-t0
@@ -185,11 +188,10 @@ def convex_adam(path_img_fixed,
     affine = nib.load(path_img_fixed).affine
     disp_nii = nib.Nifti1Image(displacements, affine)
     nib.save(disp_nii, os.path.join(result_path,'disp.nii.gz'))
-    return
 
 
 if __name__=="__main__":
-    parser=argparse.ArgumentParser()
+    parser = argparse.ArgumentParser()
     parser.add_argument("-f","--path_img_fixed", type=str, required=True)
     parser.add_argument("-m",'--path_img_moving', type=str, required=True)
     parser.add_argument('--mind_r', type=int, default=1)
