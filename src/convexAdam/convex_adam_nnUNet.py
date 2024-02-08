@@ -9,7 +9,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from convex_adam_utils import correlate, coupled_convex, inverse_consistency
+from convexAdam.convex_adam_utils import (correlate, coupled_convex,
+                                          inverse_consistency)
 
 warnings.filterwarnings("ignore")
 
