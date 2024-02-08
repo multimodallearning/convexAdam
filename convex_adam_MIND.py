@@ -19,14 +19,16 @@ from convex_adam_utils import (MINDSSC, correlate, coupled_convex,
 warnings.filterwarnings("ignore")
 
 
-# extract MIND and/or semantic nnUNet features
-def extract_features(img_fixed,
-                    img_moving,
-                    mind_r,
-                    mind_d,
-                    use_mask,
-                    mask_fixed,
-                    mask_moving):
+def extract_features(
+    img_fixed: torch.Tensor,
+    img_moving: torch.Tensor,
+    mind_r: int,
+    mind_d: int,
+    use_mask: bool,
+    mask_fixed: torch.Tensor,
+    mask_moving: torch.Tensor,
+) -> (torch.Tensor, torch.Tensor):
+    """Extract MIND and/or semantic nnUNet features"""
 
     # MIND features
     if use_mask:
@@ -56,26 +58,41 @@ def extract_features(img_fixed,
     
     return features_fix, features_mov
 
-# coupled convex optimisation with adam instance optimisation
-def convex_adam(path_img_fixed,
-                path_img_moving,
-                mind_r=1,
-                mind_d=2,
-                lambda_weight=1.25,
-                grid_sp=6,
-                disp_hw=4,
-                selected_niter=80,
-                selected_smooth=0,
-                grid_sp_adam=2,
-                ic=True,
-                use_mask=False,
-                path_fixed_mask=None,
-                path_moving_mask=None,
-                result_path='./'):
 
-    img_fixed = torch.from_numpy(nib.load(path_img_fixed).get_fdata()).float()
-    img_moving = torch.from_numpy(nib.load(path_img_moving).get_fdata()).float()
-    
+def validate_image(img: Union[torch.Tensor, np.ndarray, sitk.Image], dtype=float) -> torch.Tensor:
+    """Validate image input"""
+    if not isinstance(img, torch.Tensor):
+        if isinstance(img, sitk.Image):
+            img = sitk.GetArrayFromImage(img)
+        if isinstance(img, np.ndarray):
+            img = torch.from_numpy(img.astype(dtype))
+        else:
+            raise ValueError("Input image must be a torch.Tensor, a numpy.ndarray or a SimpleITK.Image")
+    return img
+
+
+def convex_adam_pt(
+    img_fixed: Union[torch.Tensor, np.ndarray, sitk.Image],
+    img_moving: Union[torch.Tensor, np.ndarray, sitk.Image],
+    mind_r: int = 1,
+    mind_d: int = 2,
+    lambda_weight: float = 1.25,
+    grid_sp: int = 6,
+    disp_hw: int = 4,
+    selected_niter: int = 80,
+    selected_smooth: int = 0,
+    grid_sp_adam: int = 2,
+    ic: bool = True,
+    use_mask: bool = False,
+    path_fixed_mask: Optional[Union[Path, str]] = None,
+    path_moving_mask: Optional[Union[Path, str]] = None,
+) -> None:
+    """Coupled convex optimisation with adam instance optimisation"""
+    img_fixed = validate_image(img_fixed)
+    img_moving = validate_image(img_moving)
+    img_fixed = img_fixed.float()
+    img_moving = img_moving.float()
+
     if use_mask:
         mask_fixed = torch.from_numpy(nib.load(path_fixed_mask).get_fdata()).float()
         mask_moving = torch.from_numpy(nib.load(path_moving_mask).get_fdata()).float()
@@ -92,13 +109,13 @@ def convex_adam(path_img_fixed,
     with torch.no_grad():      
 
         features_fix, features_mov = extract_features(img_fixed=img_fixed,
-                                                        img_moving=img_moving,
-                                                        mind_r=mind_r,
-                                                        mind_d=mind_d,
-                                                        use_mask=use_mask,
-                                                        mask_fixed=mask_fixed,
-                                                        mask_moving=mask_moving)
-        
+                                                      img_moving=img_moving,
+                                                      mind_r=mind_r,
+                                                      mind_d=mind_d,
+                                                      use_mask=use_mask,
+                                                      mask_fixed=mask_fixed,
+                                                      mask_moving=mask_moving)
+
         features_fix_smooth = F.avg_pool3d(features_fix,grid_sp,stride=grid_sp)
         features_mov_smooth = F.avg_pool3d(features_mov,grid_sp,stride=grid_sp)
 
@@ -184,6 +201,47 @@ def convex_adam(path_img_fixed,
     y = disp_hr[0,1,:,:,:].cpu().half().data.numpy()
     z = disp_hr[0,2,:,:,:].cpu().half().data.numpy()
     displacements = np.stack((x,y,z),3).astype(float)
+    return displacements
+
+
+def convex_adam(
+    path_img_fixed: Union[Path, str],
+    path_img_moving: Union[Path, str],
+    mind_r: int = 1,
+    mind_d: int = 2,
+    lambda_weight: float = 1.25,
+    grid_sp: int = 6,
+    disp_hw: int = 4,
+    selected_niter: int = 80,
+    selected_smooth: int = 0,
+    grid_sp_adam: int = 2,
+    ic: bool = True,
+    use_mask: bool = False,
+    path_fixed_mask: Optional[Union[Path, str]] = None,
+    path_moving_mask: Optional[Union[Path, str]] = None,
+    result_path: Union[Path, str] = './',
+) -> None:
+    """Coupled convex optimisation with adam instance optimisation"""
+
+    img_fixed = torch.from_numpy(nib.load(path_img_fixed).get_fdata()).float()
+    img_moving = torch.from_numpy(nib.load(path_img_moving).get_fdata()).float()
+
+    displacements = convex_adam_pt(
+        img_fixed=img_fixed,
+        img_moving=img_moving,
+        mind_r=mind_r,
+        mind_d=mind_d,
+        lambda_weight=lambda_weight,
+        grid_sp=grid_sp,
+        disp_hw=disp_hw,
+        selected_niter=selected_niter,
+        selected_smooth=selected_smooth,
+        grid_sp_adam=grid_sp_adam,
+        ic=ic,
+        use_mask=use_mask,
+        path_fixed_mask=path_fixed_mask,
+        path_moving_mask=path_moving_mask,
+    )
 
     affine = nib.load(path_img_fixed).affine
     disp_nii = nib.Nifti1Image(displacements, affine)
@@ -208,31 +266,22 @@ if __name__=="__main__":
     parser.add_argument('--path_mask_moving', type=str, default=None)
     parser.add_argument('--result_path', type=str, default='./')
 
-    args= parser.parse_args()
+    args = parser.parse_args()
 
-    if args.ic == 'True':
-        ic=True
-    else:
-        ic=False
-
-    if args.use_mask == 'True':
-        use_mask=True
-    else:
-        use_mask=False
-
-
-    convex_adam(args.path_img_fixed,
-                args.path_img_moving,
-                args.mind_r,
-                args.mind_d,
-                args.lambda_weight,
-                args.grid_sp,
-                args.disp_hw,
-                args.selected_niter,
-                args.selected_smooth,
-                args.grid_sp_adam,
-                ic,
-                use_mask,
-                args.path_mask_fixed,
-                args.path_mask_moving,
-                args.result_path)
+    convex_adam(
+        path_img_fixed=args.path_img_fixed,
+        path_img_moving=args.path_img_moving,
+        mind_r=args.mind_r,
+        mind_d=args.mind_d,
+        lambda_weight=args.lambda_weight,
+        grid_sp=args.grid_sp,
+        disp_hw=args.disp_hw,
+        selected_niter=args.selected_niter,
+        selected_smooth=args.selected_smooth,
+        grid_sp_adam=args.grid_sp_adam,
+        ic=(args.ic == 'True'),
+        use_mask=(args.use_mask == 'True'),
+        path_fixed_mask=args.path_mask_fixed,
+        path_moving_mask=args.path_mask_moving,
+        result_path=args.result_path
+    )
