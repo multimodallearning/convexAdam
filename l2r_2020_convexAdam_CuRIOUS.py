@@ -4,31 +4,19 @@
 # In[1]:
 
 
-import numpy as np
-
-import numpy as np
 import nibabel as nib
-import struct
-import scipy.ndimage
-from scipy.ndimage import map_coordinates, zoom
-
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 print(torch.__version__)
-import sys
 import time
-from scipy.ndimage import distance_transform_edt as edt
 
 
 def gpu_usage():
     print('gpu usage (current/max): {:.2f} / {:.2f} GB'.format(torch.cuda.memory_allocated()*1e-9, torch.cuda.max_memory_allocated()*1e-9))
 
-    
-import os
-import pandas as pd
-from scipy.ndimage.interpolation import zoom
 
 def pdist_squared(x):
     xx = (x**2).sum(dim=1).unsqueeze(2)
@@ -171,8 +159,10 @@ def kpts_world(kpts_pt, shape):
     return ((kpts_pt.flip(-1) + 1) / 2) * (torch.tensor([H, W, D]).to(device) - 1)
 
 import math
+
 import torch
 import torch.nn.functional as F
+
 
 class TPS:
     @staticmethod
