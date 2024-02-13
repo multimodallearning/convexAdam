@@ -1,0 +1,5 @@
+nibabel
+numpy
+scikit-learn
+SimpleITK
+torch

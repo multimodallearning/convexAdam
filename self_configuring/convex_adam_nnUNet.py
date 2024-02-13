@@ -1,16 +1,14 @@
+import time
+import warnings
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-from scipy.ndimage.interpolation import zoom as zoom
-from scipy.ndimage import distance_transform_edt as edt
-from convex_adam_utils import *
-import time
-import nibabel as nib
 
-import matplotlib.pyplot as plt
+from convexAdam.convex_adam_utils import (correlate, coupled_convex,
+                                          inverse_consistency)
 
-import warnings
 warnings.filterwarnings("ignore")
 
 
