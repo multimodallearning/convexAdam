@@ -28,6 +28,7 @@ def extract_features(
     mask_fixed: torch.Tensor,
     mask_moving: torch.Tensor,
     device: torch.device = torch.device("cuda"),
+    dtype: torch.dtype = torch.float16,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Extract MIND and/or semantic nnUNet features"""
 
@@ -49,13 +50,13 @@ def extract_features(
         moving_r = F.interpolate((img_moving[::2,::2,::2].to(device).reshape(-1)[idx[0]*D//2*W//2+idx[1]*D//2+idx[2]]).unsqueeze(0).unsqueeze(0),scale_factor=2,mode='trilinear')
         moving_r.view(-1)[mask.view(-1)!=0] = img_moving.to(device).reshape(-1)[mask.view(-1)!=0]
 
-        features_fix = MINDSSC(fixed_r.to(device),mind_r,mind_d).half()
-        features_mov = MINDSSC(moving_r.to(device),mind_r,mind_d).half()
+        features_fix = MINDSSC(fixed_r.to(device),mind_r,mind_d,device=device).to(dtype)
+        features_mov = MINDSSC(moving_r.to(device),mind_r,mind_d,device=device).to(dtype)
     else:
         img_fixed = img_fixed.unsqueeze(0).unsqueeze(0)
         img_moving = img_moving.unsqueeze(0).unsqueeze(0)
-        features_fix = MINDSSC(img_fixed.to(device),mind_r,mind_d).half()
-        features_mov = MINDSSC(img_moving.to(device),mind_r,mind_d).half()
+        features_fix = MINDSSC(img_fixed.to(device),mind_r,mind_d,device=device).to(dtype)
+        features_mov = MINDSSC(img_moving.to(device),mind_r,mind_d,device=device).to(dtype)
 
     return features_fix, features_mov
 
@@ -75,6 +76,7 @@ def convex_adam_pt(
     use_mask: bool = False,
     path_fixed_mask: Optional[Union[Path, str]] = None,
     path_moving_mask: Optional[Union[Path, str]] = None,
+    dtype: torch.dtype = torch.float16,
     verbose: bool = False,
 ) -> np.ndarray:
     """Coupled convex optimisation with adam instance optimisation"""
@@ -84,6 +86,9 @@ def convex_adam_pt(
     img_moving = img_moving.float()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if dtype == torch.float16 and device == torch.device("cpu"):
+        print("Warning: float16 is not supported on CPU, using float32 instead")
+        dtype = torch.float32
 
     if use_mask:
         mask_fixed = torch.from_numpy(nib.load(path_fixed_mask).get_fdata()).float()
@@ -107,6 +112,7 @@ def convex_adam_pt(
             mask_fixed=mask_fixed,
             mask_moving=mask_moving,
             device=device,
+            dtype=dtype,
         )
 
         features_fix_smooth = F.avg_pool3d(features_fix,grid_sp,stride=grid_sp)
@@ -118,14 +124,14 @@ def convex_adam_pt(
     ssd,ssd_argmin = correlate(features_fix_smooth,features_mov_smooth,disp_hw,grid_sp,(H,W,D), n_ch)
 
     # provide auxiliary mesh grid
-    disp_mesh_t = F.affine_grid(disp_hw*torch.eye(3,4).to(device).half().unsqueeze(0),(1,1,disp_hw*2+1,disp_hw*2+1,disp_hw*2+1),align_corners=True).permute(0,4,1,2,3).reshape(3,-1,1)
+    disp_mesh_t = F.affine_grid(disp_hw*torch.eye(3,4).to(device).to(dtype).unsqueeze(0),(1,1,disp_hw*2+1,disp_hw*2+1,disp_hw*2+1),align_corners=True).permute(0,4,1,2,3).reshape(3,-1,1)
 
     # perform coupled convex optimisation
     disp_soft = coupled_convex(ssd,ssd_argmin,disp_mesh_t,grid_sp,(H,W,D))
 
     # if "ic" flag is set: make inverse consistent
     if ic:
-        scale = torch.tensor([H//grid_sp-1,W//grid_sp-1,D//grid_sp-1]).view(1,3,1,1,1).to(device).half()/2
+        scale = torch.tensor([H//grid_sp-1,W//grid_sp-1,D//grid_sp-1]).view(1,3,1,1,1).to(device).to(dtype)/2
 
         ssd_,ssd_argmin_ = correlate(features_mov_smooth,features_fix_smooth,disp_hw,grid_sp,(H,W,D), n_ch)
 
@@ -189,9 +195,9 @@ def convex_adam_pt(
     if verbose:
         print(f'case time: {case_time}')
 
-    x = disp_hr[0,0,:,:,:].cpu().half().data.numpy()
-    y = disp_hr[0,1,:,:,:].cpu().half().data.numpy()
-    z = disp_hr[0,2,:,:,:].cpu().half().data.numpy()
+    x = disp_hr[0,0,:,:,:].cpu().to(dtype).data.numpy()
+    y = disp_hr[0,1,:,:,:].cpu().to(dtype).data.numpy()
+    z = disp_hr[0,2,:,:,:].cpu().to(dtype).data.numpy()
     displacements = np.stack((x,y,z),3).astype(float)
     return displacements
 

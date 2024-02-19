@@ -73,27 +73,21 @@ def MINDSSC(img, radius=2, dilation=2, device='cuda'):
 def correlate(mind_fix,mind_mov,disp_hw,grid_sp,shape, ch=12):
     H = int(shape[0]); W = int(shape[1]); D = int(shape[2]);
 
-    torch.cuda.synchronize()
-    t0 = time.time()
     with torch.no_grad():
         mind_unfold = F.unfold(F.pad(mind_mov,(disp_hw,disp_hw,disp_hw,disp_hw,disp_hw,disp_hw)).squeeze(0),disp_hw*2+1)
         mind_unfold = mind_unfold.view(ch,-1,(disp_hw*2+1)**2,W//grid_sp,D//grid_sp)
         
 
-    ssd = torch.zeros((disp_hw*2+1)**3,H//grid_sp,W//grid_sp,D//grid_sp,dtype=mind_fix.dtype, device=mind_fix.device)#.to(device).half()
+    ssd = torch.zeros((disp_hw*2+1)**3,H//grid_sp,W//grid_sp,D//grid_sp,dtype=mind_fix.dtype, device=mind_fix.device)
     ssd_argmin = torch.zeros(H//grid_sp,W//grid_sp,D//grid_sp).long()
     with torch.no_grad():
         for i in range(disp_hw*2+1):
             mind_sum = (mind_fix.permute(1,2,0,3,4)-mind_unfold[:,i:i+H//grid_sp]).pow(2).sum(0,keepdim=True)
             ssd[i::(disp_hw*2+1)] = F.avg_pool3d(F.avg_pool3d(mind_sum.transpose(2,1),3,stride=1,padding=1),3,stride=1,padding=1).squeeze(1)
         ssd = ssd.view(disp_hw*2+1,disp_hw*2+1,disp_hw*2+1,H//grid_sp,W//grid_sp,D//grid_sp).transpose(1,0).reshape((disp_hw*2+1)**3,H//grid_sp,W//grid_sp,D//grid_sp)
-        ssd_argmin = torch.argmin(ssd,0)#
-    torch.cuda.synchronize()
+        ssd_argmin = torch.argmin(ssd,0)
 
-    t1 = time.time()
-    #print(t1-t0,'sec (ssd)')
-    #gpu_usage()
-    return ssd,ssd_argmin
+    return ssd, ssd_argmin
 
 
 
