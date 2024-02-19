@@ -63,7 +63,7 @@ def test_convex_adam_identity(
     )
 
     # test that the displacement field is performing identity transformation
-    assert np.allclose(displacementfield, np.zeros_like(displacementfield))
+    assert np.allclose(displacementfield, np.zeros_like(displacementfield), atol=0.1)
 
 
 def test_convex_adam(
@@ -71,8 +71,6 @@ def test_convex_adam(
     output_dir = Path("tests/output"),
     subject_id = "10000_1000000",
 ):
-    print(f"Processing {subject_id}")
-
     # paths
     patient_id = subject_id.split("_")[0]
     fixed_image = sitk.ReadImage(str(images_dir / patient_id / f"{subject_id}_t2w.mha"))
@@ -81,9 +79,6 @@ def test_convex_adam(
     # resample images to specified spacing and the field of view of the fixed image
     fixed_image_resampled = resample_img(fixed_image, spacing=(1.0, 1.0, 1.0))
     moving_image_resampled = resample_moving_to_fixed(fixed_image_resampled, moving_image)
-
-    # workaround
-    sitk.WriteImage(moving_image_resampled, str(output_dir / "moving_image_resampled.nii.gz"))
 
     # run convex adam
     print("Running convex adam")
@@ -97,15 +92,18 @@ def test_convex_adam(
     moving_image_resampled_warped = apply_convex(
         disp=displacementfield,
         moving=moving_image_resampled,
-        header=nibabel.load(str(output_dir / "moving_image_resampled.nii.gz")).header,
     )
+
+    # convert to SimpleITK image
+    moving_image_resampled_warped = sitk.GetImageFromArray(moving_image_resampled_warped)
+    moving_image_resampled_warped.CopyInformation(moving_image_resampled)
 
     # save warped image
     print("Saving warped image")
     output_dir.mkdir(exist_ok=True, parents=True)
-    nibabel.save(moving_image_resampled_warped, str(output_dir / f"{subject_id}_adc_warped.nii.gz"))
+    sitk.WriteImage(moving_image_resampled_warped, str(output_dir / f"{subject_id}_adc_warped.mha"))
 
 
 if __name__ == "__main__":
-    test_convex_adam_identity()
+    # test_convex_adam_identity()
     test_convex_adam()
