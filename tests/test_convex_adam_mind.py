@@ -214,6 +214,7 @@ def test_convex_adam_identity_rotated_direction(
     moving_image.SetOrigin([0, 0, 0])
     fixed_image.SetDirection([1, 0, 0, 0, 1, 0, 0, 0, 1])
     fixed_image.SetOrigin([0, 0, 0])
+    sitk.WriteImage(fixed_image, str(output_dir / patient_id / f"{subject_id}_fixed_unity.mha"))
 
     # rotate the moving image twice: once by updating the direction cosines and once by resampling the image
     angle = np.pi / 4.0
@@ -223,6 +224,7 @@ def test_convex_adam_identity_rotated_direction(
     # resample images to specified spacing and the field of view of the fixed image
     fixed_image_resampled = resample_img(fixed_image, spacing=(1.0, 1.0, 1.0))
     moving_image_resampled = resample_moving_to_fixed(fixed_image_resampled, moving_image)
+    sitk.WriteImage(fixed_image_resampled, str(output_dir / patient_id / f"{subject_id}_fixed_resampled.mha"))
 
     # run convex adam
     displacementfield = convex_adam_pt(
@@ -242,8 +244,7 @@ def test_convex_adam_identity_rotated_direction(
 
     # save warped image
     output_dir.mkdir(exist_ok=True, parents=True)
-    sitk.WriteImage(moving_image_resampled_warped, str(output_dir / patient_id / f"{subject_id}_t2w_rotation_warped.mha"))
-    sitk.WriteImage(fixed_image_resampled, str(output_dir / patient_id / f"{subject_id}_t2w_resampled.mha"))
+    sitk.WriteImage(moving_image_resampled_warped, str(output_dir / patient_id / f"{subject_id}_moving_rotation_warped.mha"))
 
     # test that the displacement field is performing identity transformation
     d1, d2, d3 = np.array(displacementfield.shape[0:3]) // 3
