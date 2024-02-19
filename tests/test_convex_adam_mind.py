@@ -311,13 +311,33 @@ def test_convex_adam_identity_rotated_and_shifted(
     sitk.WriteImage(moving_image_resampled_warped, str(output_dir / patient_id / f"{subject_id}_moving_rotated_and_shifted_warped.mha"))
 
     # apply displacement field to the moving image without resampling
+    channels_resampled = []
+    for i in range(3):
+        displacement_field_channel = sitk.GetImageFromArray(displacementfield[:, :, :, i])
+        displacement_field_channel.CopyInformation(fixed_image_resampled)
+
+        # set up the resampling filter
+        resampler = sitk.ResampleImageFilter()
+        # resampler.SetReferenceImage(fixed_image)
+        resampler.SetReferenceImage(moving_image)
+        resampler.SetInterpolator(sitk.sitkLinear)
+
+        # apply resampling
+        displacement_field_resampled = resampler.Execute(displacement_field_channel)
+
+        # append to list of channels
+        channels_resampled.append(displacement_field_resampled)
+
+    # combine channels
+    displacement_field_resampled = sitk.JoinSeries(channels_resampled)
+    displacement_field_resampled = np.moveaxis(sitk.GetArrayFromImage(displacement_field_resampled), 0, -1)
     moving_image_warped = apply_convex(
-        disp=displacementfield,
+        disp=displacement_field_resampled,
         moving=moving_image,
     )
     moving_image_warped = sitk.GetImageFromArray(moving_image_warped.astype(np.float32))
-    moving_image_warped.CopyInformation(fixed_image_resampled)
-    sitk.WriteImage(moving_image_resampled_warped, str(output_dir / patient_id / f"{subject_id}_original_moving_rotated_and_shifted_warped.mha"))
+    moving_image_warped.CopyInformation(moving_image)
+    sitk.WriteImage(moving_image_warped, str(output_dir / patient_id / f"{subject_id}_original_moving_rotated_and_shifted_warped.mha"))
 
 
 if __name__ == "__main__":
