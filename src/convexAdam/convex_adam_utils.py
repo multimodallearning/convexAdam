@@ -19,7 +19,7 @@ def pdist_squared(x):
     return dist
 
 
-def MINDSSC(img, radius=2, dilation=2):
+def MINDSSC(img, radius=2, dilation=2, device='cuda'):
     # see http://mpheinrich.de/pub/miccai2013_943_mheinrich.pdf for details on the MIND-SSC descriptor
     
     # kernel size
@@ -43,9 +43,9 @@ def MINDSSC(img, radius=2, dilation=2):
     # build kernel
     idx_shift1 = six_neighbourhood.unsqueeze(1).repeat(1,6,1).view(-1,3)[mask,:]
     idx_shift2 = six_neighbourhood.unsqueeze(0).repeat(6,1,1).view(-1,3)[mask,:]
-    mshift1 = torch.zeros(12, 1, 3, 3, 3).cuda()
+    mshift1 = torch.zeros(12, 1, 3, 3, 3).to(device)
     mshift1.view(-1)[torch.arange(12) * 27 + idx_shift1[:,0] * 9 + idx_shift1[:, 1] * 3 + idx_shift1[:, 2]] = 1
-    mshift2 = torch.zeros(12, 1, 3, 3, 3).cuda()
+    mshift2 = torch.zeros(12, 1, 3, 3, 3).to(device)
     mshift2.view(-1)[torch.arange(12) * 27 + idx_shift2[:,0] * 9 + idx_shift2[:, 1] * 3 + idx_shift2[:, 2]] = 1
     rpad1 = nn.ReplicationPad3d(dilation)
     rpad2 = nn.ReplicationPad3d(radius)
@@ -77,7 +77,7 @@ def correlate(mind_fix,mind_mov,disp_hw,grid_sp,shape, ch=12):
         mind_unfold = mind_unfold.view(ch,-1,(disp_hw*2+1)**2,W//grid_sp,D//grid_sp)
         
 
-    ssd = torch.zeros((disp_hw*2+1)**3,H//grid_sp,W//grid_sp,D//grid_sp,dtype=mind_fix.dtype, device=mind_fix.device)#.cuda().half()
+    ssd = torch.zeros((disp_hw*2+1)**3,H//grid_sp,W//grid_sp,D//grid_sp,dtype=mind_fix.dtype, device=mind_fix.device)#.to(device).half()
     ssd_argmin = torch.zeros(H//grid_sp,W//grid_sp,D//grid_sp).long()
     with torch.no_grad():
         for i in range(disp_hw*2+1):
@@ -227,7 +227,7 @@ def compute_steps_for_sliding_window(patch_size, image_size, step_size=.5):
 
 
 
-def get_gaussian(patch_size, sigma_scale=1. / 8) -> np.ndarray:
+def get_gaussian(patch_size, sigma_scale=1. / 8, device='cuda') -> np.ndarray:
     tmp = np.zeros(patch_size)
     center_coords = [i // 2 for i in patch_size]
     sigmas = [i * sigma_scale for i in patch_size]
@@ -240,7 +240,7 @@ def get_gaussian(patch_size, sigma_scale=1. / 8) -> np.ndarray:
     gaussian_importance_map[gaussian_importance_map == 0] = np.min(
         gaussian_importance_map[gaussian_importance_map != 0])
 
-    return torch.from_numpy(gaussian_importance_map).unsqueeze(0).unsqueeze(0).half().cuda()
+    return torch.from_numpy(gaussian_importance_map).unsqueeze(0).unsqueeze(0).half().to(device)
 
 
 def create_nonzero_mask(data):
