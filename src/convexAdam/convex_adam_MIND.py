@@ -95,7 +95,7 @@ def convex_adam_pt(
     img_fixed = img_fixed.float()
     img_moving = img_moving.float()
 
-    device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu"))
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     if use_mask:
         mask_fixed = torch.from_numpy(nib.load(path_fixed_mask).get_fdata()).float()
@@ -118,7 +118,7 @@ def convex_adam_pt(
             use_mask=use_mask,
             mask_fixed=mask_fixed,
             mask_moving=mask_moving,
-            devide=device,
+            device=device,
         )
 
         features_fix_smooth = F.avg_pool3d(features_fix,grid_sp,stride=grid_sp)
