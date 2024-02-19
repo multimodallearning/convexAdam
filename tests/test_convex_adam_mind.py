@@ -37,14 +37,14 @@ def resample_moving_to_fixed(fixed: sitk.Image, moving: sitk.Image):
 
 
 def test_convex_adam_identity(
-    images_dir = Path("tests/input"),
+    input_dir = Path("tests/input"),
     output_dir = Path("tests/output"),
     subject_id = "10000_1000000",
 ):
     # paths
     patient_id = subject_id.split("_")[0]
-    fixed_image = sitk.ReadImage(str(images_dir / patient_id / f"{subject_id}_t2w.mha"))
-    moving_image = sitk.ReadImage(str(images_dir / patient_id / f"{subject_id}_t2w.mha"))
+    fixed_image = sitk.ReadImage(str(input_dir / patient_id / f"{subject_id}_t2w.mha"))
+    moving_image = sitk.ReadImage(str(input_dir / patient_id / f"{subject_id}_t2w.mha"))
 
     # resample images to specified spacing and the field of view of the fixed image
     fixed_image_resampled = resample_img(fixed_image, spacing=(1.0, 1.0, 1.0))
@@ -56,7 +56,6 @@ def test_convex_adam_identity(
     sitk.WriteImage(moving_image_resampled, str(output_dir / patient_id / "moving_image_resampled.nii.gz"))
 
     # run convex adam
-    print("Running convex adam")
     displacementfield = convex_adam_pt(
         img_fixed=fixed_image_resampled,
         img_moving=moving_image_resampled,
@@ -67,41 +66,46 @@ def test_convex_adam_identity(
 
 
 def test_convex_adam(
-    images_dir = Path("tests/input"),
+    input_dir = Path("tests/input"),
     output_dir = Path("tests/output"),
+    output_expected_dir = Path("tests/output-expected"),
     subject_id = "10000_1000000",
 ):
     # paths
     patient_id = subject_id.split("_")[0]
-    fixed_image = sitk.ReadImage(str(images_dir / patient_id / f"{subject_id}_t2w.mha"))
-    moving_image = sitk.ReadImage(str(images_dir / patient_id / f"{subject_id}_adc.mha"))
+    fixed_image = sitk.ReadImage(str(input_dir / patient_id / f"{subject_id}_t2w.mha"))
+    moving_image = sitk.ReadImage(str(input_dir / patient_id / f"{subject_id}_adc.mha"))
+    moving_image_reference = sitk.ReadImage(str(output_expected_dir / patient_id / f"{subject_id}_adc_warped.mha"))
 
     # resample images to specified spacing and the field of view of the fixed image
     fixed_image_resampled = resample_img(fixed_image, spacing=(1.0, 1.0, 1.0))
     moving_image_resampled = resample_moving_to_fixed(fixed_image_resampled, moving_image)
 
     # run convex adam
-    print("Running convex adam")
     displacementfield = convex_adam_pt(
         img_fixed=fixed_image_resampled,
         img_moving=moving_image_resampled,
     )
 
     # apply displacement field
-    print("Applying displacement field")
     moving_image_resampled_warped = apply_convex(
         disp=displacementfield,
         moving=moving_image_resampled,
     )
 
     # convert to SimpleITK image
-    moving_image_resampled_warped = sitk.GetImageFromArray(moving_image_resampled_warped)
+    moving_image_resampled_warped = sitk.GetImageFromArray(moving_image_resampled_warped.astype(np.float32))
     moving_image_resampled_warped.CopyInformation(moving_image_resampled)
 
     # save warped image
-    print("Saving warped image")
     output_dir.mkdir(exist_ok=True, parents=True)
-    sitk.WriteImage(moving_image_resampled_warped, str(output_dir / f"{subject_id}_adc_warped.mha"))
+    sitk.WriteImage(moving_image_resampled_warped, str(output_dir / patient_id / f"{subject_id}_adc_warped.mha"))
+
+    # compare with reference
+    assert np.allclose(
+        sitk.GetArrayFromImage(moving_image_resampled_warped),
+        sitk.GetArrayFromImage(moving_image_reference),
+    )
 
 
 if __name__ == "__main__":
