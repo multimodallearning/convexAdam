@@ -14,7 +14,7 @@ import torch.nn.functional as F
 from scipy.ndimage import distance_transform_edt as edt
 
 from convexAdam.convex_adam_utils import (MINDSSC, correlate, coupled_convex,
-                                          inverse_consistency)
+                                          inverse_consistency, validate_image)
 
 warnings.filterwarnings("ignore")
 
@@ -60,21 +60,9 @@ def extract_features(
     return features_fix, features_mov
 
 
-def validate_image(img: Union[torch.Tensor, np.ndarray, sitk.Image], dtype=float) -> torch.Tensor:
-    """Validate image input"""
-    if not isinstance(img, torch.Tensor):
-        if isinstance(img, sitk.Image):
-            img = sitk.GetArrayFromImage(img)
-        if isinstance(img, np.ndarray):
-            img = torch.from_numpy(img.astype(dtype))
-        else:
-            raise ValueError("Input image must be a torch.Tensor, a numpy.ndarray or a SimpleITK.Image")
-    return img
-
-
 def convex_adam_pt(
-    img_fixed: Union[torch.Tensor, np.ndarray, sitk.Image],
-    img_moving: Union[torch.Tensor, np.ndarray, sitk.Image],
+    img_fixed: Union[torch.Tensor, np.ndarray, sitk.Image, nib.Nifti1Image],
+    img_moving: Union[torch.Tensor, np.ndarray, sitk.Image, nib.Nifti1Image],
     mind_r: int = 1,
     mind_d: int = 2,
     lambda_weight: float = 1.25,

@@ -1,7 +1,10 @@
 import time
 import warnings
+from typing import Union
 
+import nibabel as nib
 import numpy as np
+import SimpleITK as sitk
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -269,3 +272,17 @@ def crop_to_bbox(image, bbox):
     assert len(image.shape) == 3, "only supports 3d images"
     resizer = (slice(bbox[0][0], bbox[0][1]), slice(bbox[1][0], bbox[1][1]), slice(bbox[2][0], bbox[2][1]))
     return image[resizer]
+
+
+def validate_image(img: Union[torch.Tensor, np.ndarray, sitk.Image], dtype=float) -> torch.Tensor:
+    """Validate image input"""
+    if not isinstance(img, torch.Tensor):
+        if isinstance(img, sitk.Image):
+            img = sitk.GetArrayFromImage(img)
+        elif isinstance(img, nib.Nifti1Image):
+            img = img.get_fdata()
+        if isinstance(img, np.ndarray):
+            img = torch.from_numpy(img.astype(dtype))
+        else:
+            raise ValueError("Input image must be a torch.Tensor, a numpy.ndarray or a SimpleITK.Image")
+    return img
