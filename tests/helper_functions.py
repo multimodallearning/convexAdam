@@ -1,11 +1,5 @@
-from pathlib import Path
-
 import numpy as np
 import SimpleITK as sitk
-from matplotlib import pyplot as plt
-
-from convexAdam.apply_convex import apply_convex
-from convexAdam.convex_adam_MIND import convex_adam_pt
 
 
 def resample_img(img: sitk.Image, spacing: tuple[float, float, float]) -> sitk.Image:
@@ -123,58 +117,3 @@ def matrix_from_axis_angle(a):
     #      cross_product_matrix(a[:3]) * np.sin(theta))
 
     return R
-
-def resample(image, transform):
-    """
-    This function resamples (updates) an image using a specified transform
-    :param image: The sitk image we are trying to transform
-    :param transform: An sitk transform (ex. resizing, rotation, etc.
-    :return: The transformed sitk image
-    """
-    reference_image = image
-    interpolator = sitk.sitkLinear
-    default_value = 0
-    return sitk.Resample(image, reference_image, transform,
-                         interpolator, default_value)
-
-
-def get_center(img):
-    """
-    This function returns the physical center point of a 3d sitk image
-    :param img: The sitk image we are trying to find the center of
-    :return: The physical center point of the image
-    """
-    width, height, depth = img.GetSize()
-    return img.TransformIndexToPhysicalPoint((int(np.ceil(width/2)),
-                                              int(np.ceil(height/2)),
-                                              int(np.ceil(depth/2))))
-
-
-def rotation3d(image, theta_z, show=False):
-    """
-    This function rotates an image across each of the x, y, z axes by theta_x, theta_y, and theta_z degrees
-    respectively
-    :param image: An sitk MRI image
-    :param theta_x: The amount of degrees the user wants the image rotated around the x axis
-    :param theta_y: The amount of degrees the user wants the image rotated around the y axis
-    :param theta_z: The amount of degrees the user wants the image rotated around the z axis
-    :param show: Boolean, whether or not the user wants to see the result of the rotation
-    :return: The rotated image
-    """
-    theta_z = np.deg2rad(theta_z)
-    euler_transform = sitk.Euler3DTransform()
-    print(euler_transform.GetMatrix())
-    image_center = get_center(image)
-    euler_transform.SetCenter(image_center)
-
-    direction = image.GetDirection()
-    axis_angle = (direction[2], direction[5], direction[8], theta_z)
-    np_rot_mat = matrix_from_axis_angle(axis_angle)
-    print(np_rot_mat)
-    euler_transform.SetMatrix(np_rot_mat.flatten().tolist())
-    resampled_image = resample(image, euler_transform)
-    if show:
-        slice_num = 15#int(input("Enter the index of the slice you would like to see"))
-        plt.imshow(sitk.GetArrayFromImage(resampled_image)[slice_num], cmap='gray')
-        plt.show()
-    return resampled_image
