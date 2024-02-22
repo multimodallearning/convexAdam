@@ -37,6 +37,9 @@ def rotate_image_around_center_affine(image: sitk.Image, angle: float) -> None:
         moving_image (sitk.image): The image to be rotated.
         angle (float): The angle of rotation in radians.
     """
+    original_origin = np.array(image.GetOrigin())
+    image.SetOrigin([0, 0, 0])
+
     # Calculate the physical center of the image
     physical_center = image.TransformContinuousIndexToPhysicalPoint(np.array(image.GetSize())/2.0)
 
@@ -56,7 +59,7 @@ def rotate_image_around_center_affine(image: sitk.Image, angle: float) -> None:
 
     # Update the image with the new direction and origin
     image.SetDirection(new_direction_cosines.flatten())
-    image.SetOrigin(new_origin)
+    image.SetOrigin(new_origin + original_origin)
 
 
 def rotate_image_around_center_resample(image: sitk.Image, angle: float) -> sitk.Image:
