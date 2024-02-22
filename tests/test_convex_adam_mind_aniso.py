@@ -10,7 +10,7 @@ from convexAdam.apply_convex import apply_convex
 from convexAdam.convex_adam_MIND import convex_adam_pt
 
 
-def test_convex_adam_rotated_and_shifted(
+def test_convex_adam_rotated_and_shifted_anisotropic(
     input_dir = Path("tests/input"),
     output_dir = Path("tests/output"),
     subject_id = "10000_1000000",
@@ -108,5 +108,5 @@ def test_convex_adam_rotated_and_shifted(
 
 
 if __name__ == "__main__":
-    test_convex_adam_rotated_and_shifted()
+    test_convex_adam_rotated_and_shifted_anisotropic()
     print("All tests passed")
