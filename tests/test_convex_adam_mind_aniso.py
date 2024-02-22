@@ -63,7 +63,9 @@ def test_convex_adam_rotated_and_shifted_anisotropic(
     output_dir.mkdir(exist_ok=True, parents=True)
     sitk.WriteImage(moving_image_resampled_warped, str(output_dir / patient_id / f"{subject_id}_moving_rotated_and_shifted_resampled_warped.mha"))
 
-    # apply displacement field to the moving image without resampling
+    # apply displacement field to the moving image without resampling the moving image
+
+    # resample the displacement field to the physical space of the original moving image
     channels_resampled = []
     for i in range(3):
         displacement_field_channel = sitk.GetImageFromArray(displacementfield[:, :, :, i])
