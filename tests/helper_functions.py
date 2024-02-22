@@ -65,9 +65,9 @@ def rotate_image_around_center_affine(image: sitk.Image, angle: float) -> None:
     image.SetOrigin(new_origin)
 
 
-def rotate_image_around_center_resample(moving_image: sitk.Image, angle: float) -> sitk.Image:
+def rotate_image_around_center_resample(image: sitk.Image, angle: float) -> sitk.Image:
     """
-    Rotate the given image around its center by the specified angle.
+    Rotate the given image around its center by the specified angle. The rotation is around the z-axis.
 
     Parameters:
         moving_image (sitk.image): The image to be rotated.
@@ -75,17 +75,18 @@ def rotate_image_around_center_resample(moving_image: sitk.Image, angle: float) 
     """
     scale_factor = 1.0
     translation = (0, 0, 0)
-    rotation_center = moving_image.TransformContinuousIndexToPhysicalPoint(np.array(moving_image.GetSize())/2.0)
-    axis = (0, 0, 1)
+    rotation_center = image.TransformContinuousIndexToPhysicalPoint(np.array(image.GetSize())/2.0)
+    direction = image.GetDirection()
+    axis = (direction[2], direction[5], direction[8])
 
     # rotate moving image
     similarity_transform = sitk.Similarity3DTransform(
         scale_factor, axis, angle, translation, rotation_center
     )
 
-    moving_image = sitk.Resample(moving_image, similarity_transform)
+    image = sitk.Resample(image, similarity_transform)
 
-    return moving_image
+    return image
 
 
 # This function is from https://github.com/rock-learning/pytransform3d/blob/7589e083a50597a75b12d745ebacaa7cc056cfbd/pytransform3d/rotations.py#L302
