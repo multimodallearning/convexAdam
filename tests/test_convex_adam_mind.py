@@ -7,7 +7,7 @@ from convexAdam.apply_convex import apply_convex
 from convexAdam.convex_adam_MIND import convex_adam_pt
 
 
-def resample_img(img: sitk.Image, spacing: tuple[float, float, float]):
+def resample_img(img: sitk.Image, spacing: tuple[float, float, float]) -> sitk.Image:
     resample = sitk.ResampleImageFilter()
     resample.SetOutputSpacing(spacing)
     resample.SetSize([int(sz * spc / new_spc + 0.5) for sz, spc, new_spc in zip(img.GetSize(), img.GetSpacing(), spacing)])
@@ -20,7 +20,7 @@ def resample_img(img: sitk.Image, spacing: tuple[float, float, float]):
     return resample.Execute(img)
 
 
-def resample_moving_to_fixed(fixed: sitk.Image, moving: sitk.Image):
+def resample_moving_to_fixed(fixed: sitk.Image, moving: sitk.Image) -> sitk.Image:
     """Resample moving image to the same grid as the fixed image"""
     resample = sitk.ResampleImageFilter()
     resample.SetOutputSpacing(fixed.GetSpacing())
@@ -270,7 +270,7 @@ def test_convex_adam_identity_rotated_and_shifted(
     sitk.WriteImage(fixed_image, str(output_dir / patient_id / f"{subject_id}_fixed_unity.mha"))
 
     # rotate the moving image twice: once by updating the direction cosines and once by resampling the image
-    angle = np.pi / 4.0
+    angle = np.pi / 2.0
     moving_image = rotate_image_around_center_resample(moving_image, angle)
     rotate_image_around_center_affine(moving_image, angle)
 
@@ -318,7 +318,6 @@ def test_convex_adam_identity_rotated_and_shifted(
 
         # set up the resampling filter
         resampler = sitk.ResampleImageFilter()
-        # resampler.SetReferenceImage(fixed_image)
         resampler.SetReferenceImage(moving_image)
         resampler.SetInterpolator(sitk.sitkLinear)
 
@@ -331,8 +330,23 @@ def test_convex_adam_identity_rotated_and_shifted(
     # combine channels
     displacement_field_resampled = sitk.JoinSeries(channels_resampled)
     displacement_field_resampled = np.moveaxis(sitk.GetArrayFromImage(displacement_field_resampled), 0, -1)
+
+    # find the rotation between the direction of the moving image and the direction of the fixed image
+    fixed_direction = np.array(fixed_image.GetDirection()).reshape(3, 3)
+    moving_direction = np.array(moving_image.GetDirection()).reshape(3, 3)
+    rotation = np.dot(np.linalg.inv(fixed_direction), moving_direction)
+
+    # rotate the vectors in the displacement field (the z, y, x components are in the last dimension)
+    displacement_field_resampled = displacement_field_resampled[..., ::-1]  # make the order x, y, z
+    displacement_field_rotated = np.dot(displacement_field_resampled, rotation)
+    displacement_field_rotated = displacement_field_rotated[..., ::-1]  # make the order z, y, x
+
+    # adapt the displacement field to the original moving image, which has a different spacing
+    scaling_factor = np.array(fixed_image_resampled.GetSpacing()) / np.array(moving_image.GetSpacing())
+    displacement_field_rescaled = displacement_field_rotated * list(scaling_factor)[::-1]
+
     moving_image_warped = apply_convex(
-        disp=displacement_field_resampled,
+        disp=displacement_field_rescaled,
         moving=moving_image,
     )
     moving_image_warped = sitk.GetImageFromArray(moving_image_warped.astype(np.float32))
@@ -341,9 +355,9 @@ def test_convex_adam_identity_rotated_and_shifted(
 
 
 if __name__ == "__main__":
-    test_convex_adam_identity()
-    test_convex_adam()
-    test_convex_adam_translation()
-    test_convex_adam_identity_rotated_direction()
+    # test_convex_adam_identity()
+    # test_convex_adam()
+    # test_convex_adam_translation()
+    # test_convex_adam_identity_rotated_direction()
     test_convex_adam_identity_rotated_and_shifted()
     print("All tests passed")
