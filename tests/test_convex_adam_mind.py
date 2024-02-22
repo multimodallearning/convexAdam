@@ -270,7 +270,7 @@ def test_convex_adam_identity_rotated_and_shifted(
     sitk.WriteImage(fixed_image, str(output_dir / patient_id / f"{subject_id}_fixed_unity.mha"))
 
     # rotate the moving image twice: once by updating the direction cosines and once by resampling the image
-    angle = np.pi / 2.0
+    angle = np.pi / 4.0
     moving_image = rotate_image_around_center_resample(moving_image, angle)
     rotate_image_around_center_affine(moving_image, angle)
 
@@ -355,9 +355,9 @@ def test_convex_adam_identity_rotated_and_shifted(
 
 
 if __name__ == "__main__":
-    # test_convex_adam_identity()
-    # test_convex_adam()
-    # test_convex_adam_translation()
-    # test_convex_adam_identity_rotated_direction()
+    test_convex_adam_identity()
+    test_convex_adam()
+    test_convex_adam_translation()
+    test_convex_adam_identity_rotated_direction()
     test_convex_adam_identity_rotated_and_shifted()
     print("All tests passed")
