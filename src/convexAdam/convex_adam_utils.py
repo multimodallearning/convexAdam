@@ -1,7 +1,10 @@
 import time
 import warnings
+from typing import Union
 
+import nibabel as nib
 import numpy as np
+import SimpleITK as sitk
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -19,7 +22,7 @@ def pdist_squared(x):
     return dist
 
 
-def MINDSSC(img, radius=2, dilation=2):
+def MINDSSC(img, radius=2, dilation=2, device='cuda'):
     # see http://mpheinrich.de/pub/miccai2013_943_mheinrich.pdf for details on the MIND-SSC descriptor
     
     # kernel size
@@ -43,9 +46,9 @@ def MINDSSC(img, radius=2, dilation=2):
     # build kernel
     idx_shift1 = six_neighbourhood.unsqueeze(1).repeat(1,6,1).view(-1,3)[mask,:]
     idx_shift2 = six_neighbourhood.unsqueeze(0).repeat(6,1,1).view(-1,3)[mask,:]
-    mshift1 = torch.zeros(12, 1, 3, 3, 3).cuda()
+    mshift1 = torch.zeros(12, 1, 3, 3, 3).to(device)
     mshift1.view(-1)[torch.arange(12) * 27 + idx_shift1[:,0] * 9 + idx_shift1[:, 1] * 3 + idx_shift1[:, 2]] = 1
-    mshift2 = torch.zeros(12, 1, 3, 3, 3).cuda()
+    mshift2 = torch.zeros(12, 1, 3, 3, 3).to(device)
     mshift2.view(-1)[torch.arange(12) * 27 + idx_shift2[:,0] * 9 + idx_shift2[:, 1] * 3 + idx_shift2[:, 2]] = 1
     rpad1 = nn.ReplicationPad3d(dilation)
     rpad2 = nn.ReplicationPad3d(radius)
@@ -70,27 +73,21 @@ def MINDSSC(img, radius=2, dilation=2):
 def correlate(mind_fix,mind_mov,disp_hw,grid_sp,shape, ch=12):
     H = int(shape[0]); W = int(shape[1]); D = int(shape[2]);
 
-    torch.cuda.synchronize()
-    t0 = time.time()
     with torch.no_grad():
         mind_unfold = F.unfold(F.pad(mind_mov,(disp_hw,disp_hw,disp_hw,disp_hw,disp_hw,disp_hw)).squeeze(0),disp_hw*2+1)
         mind_unfold = mind_unfold.view(ch,-1,(disp_hw*2+1)**2,W//grid_sp,D//grid_sp)
         
 
-    ssd = torch.zeros((disp_hw*2+1)**3,H//grid_sp,W//grid_sp,D//grid_sp,dtype=mind_fix.dtype, device=mind_fix.device)#.cuda().half()
+    ssd = torch.zeros((disp_hw*2+1)**3,H//grid_sp,W//grid_sp,D//grid_sp,dtype=mind_fix.dtype, device=mind_fix.device)
     ssd_argmin = torch.zeros(H//grid_sp,W//grid_sp,D//grid_sp).long()
     with torch.no_grad():
         for i in range(disp_hw*2+1):
             mind_sum = (mind_fix.permute(1,2,0,3,4)-mind_unfold[:,i:i+H//grid_sp]).pow(2).sum(0,keepdim=True)
             ssd[i::(disp_hw*2+1)] = F.avg_pool3d(F.avg_pool3d(mind_sum.transpose(2,1),3,stride=1,padding=1),3,stride=1,padding=1).squeeze(1)
         ssd = ssd.view(disp_hw*2+1,disp_hw*2+1,disp_hw*2+1,H//grid_sp,W//grid_sp,D//grid_sp).transpose(1,0).reshape((disp_hw*2+1)**3,H//grid_sp,W//grid_sp,D//grid_sp)
-        ssd_argmin = torch.argmin(ssd,0)#
-    torch.cuda.synchronize()
+        ssd_argmin = torch.argmin(ssd,0)
 
-    t1 = time.time()
-    #print(t1-t0,'sec (ssd)')
-    #gpu_usage()
-    return ssd,ssd_argmin
+    return ssd, ssd_argmin
 
 
 
@@ -227,7 +224,7 @@ def compute_steps_for_sliding_window(patch_size, image_size, step_size=.5):
 
 
 
-def get_gaussian(patch_size, sigma_scale=1. / 8) -> np.ndarray:
+def get_gaussian(patch_size, sigma_scale=1. / 8, device='cuda') -> np.ndarray:
     tmp = np.zeros(patch_size)
     center_coords = [i // 2 for i in patch_size]
     sigmas = [i * sigma_scale for i in patch_size]
@@ -240,7 +237,7 @@ def get_gaussian(patch_size, sigma_scale=1. / 8) -> np.ndarray:
     gaussian_importance_map[gaussian_importance_map == 0] = np.min(
         gaussian_importance_map[gaussian_importance_map != 0])
 
-    return torch.from_numpy(gaussian_importance_map).unsqueeze(0).unsqueeze(0).half().cuda()
+    return torch.from_numpy(gaussian_importance_map).unsqueeze(0).unsqueeze(0).half().to(device)
 
 
 def create_nonzero_mask(data):
@@ -269,3 +266,17 @@ def crop_to_bbox(image, bbox):
     assert len(image.shape) == 3, "only supports 3d images"
     resizer = (slice(bbox[0][0], bbox[0][1]), slice(bbox[1][0], bbox[1][1]), slice(bbox[2][0], bbox[2][1]))
     return image[resizer]
+
+
+def validate_image(img: Union[torch.Tensor, np.ndarray, sitk.Image], dtype=float) -> torch.Tensor:
+    """Validate image input"""
+    if not isinstance(img, torch.Tensor):
+        if isinstance(img, sitk.Image):
+            img = sitk.GetArrayFromImage(img)
+        elif isinstance(img, nib.Nifti1Image):
+            img = img.get_fdata()
+        if isinstance(img, np.ndarray):
+            img = torch.from_numpy(img.astype(dtype))
+        else:
+            raise ValueError("Input image must be a torch.Tensor, a numpy.ndarray or a SimpleITK.Image")
+    return img
