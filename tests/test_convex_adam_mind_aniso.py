@@ -6,7 +6,7 @@ from helper_functions import (resample_img, resample_moving_to_fixed,
                               rotate_image_around_center_affine,
                               rotate_image_around_center_resample)
 
-from convexAdam.apply_convex import apply_convex
+from convexAdam.apply_convex import apply_convex, apply_convex_original_moving
 from convexAdam.convex_adam_MIND import convex_adam_pt
 
 
@@ -109,6 +109,37 @@ def test_convex_adam_rotated_and_shifted_anisotropic(
     sitk.WriteImage(moving_image_warped, str(output_dir / patient_id / f"{subject_id}_moving_rotated_and_shifted_warped.mha"))
 
 
+def test_convex_adam_anisotropic(
+    input_dir = Path("tests/input"),
+    output_dir = Path("tests/output"),
+    subject_id = "10000_1000000",
+):
+    # paths
+    patient_id = subject_id.split("_")[0]
+    fixed_image = sitk.ReadImage(str(input_dir / patient_id / f"{subject_id}_t2w.mha"))
+    moving_image = sitk.ReadImage(str(input_dir / patient_id / f"{subject_id}_adc.mha"))
+
+    # resample images to specified spacing and the field of view of the fixed image
+    fixed_image_resampled = resample_img(fixed_image, spacing=(1.0, 1.0, 1.0))
+    moving_image_resampled = resample_moving_to_fixed(fixed_image_resampled, moving_image)
+
+    # run convex adam
+    displacementfield = convex_adam_pt(
+        img_fixed=fixed_image_resampled,
+        img_moving=moving_image_resampled,
+    )
+
+    # apply displacement field to the moving image without resampling the moving image
+    moving_image_warped = apply_convex_original_moving(
+        disp=displacementfield,
+        moving_image_original=moving_image,
+        fixed_image_original=fixed_image,
+        fixed_image_resampled=fixed_image_resampled,
+    )
+    sitk.WriteImage(moving_image_warped, str(output_dir / patient_id / f"{subject_id}_moving_warped.mha"))
+
+
 if __name__ == "__main__":
     test_convex_adam_rotated_and_shifted_anisotropic()
+    test_convex_adam_anisotropic()
     print("All tests passed")
