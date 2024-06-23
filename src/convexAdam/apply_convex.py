@@ -82,7 +82,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--input_field", dest="input_field", help="input convex displacement field (.nii.gz) full resolution", default=None, required=True)
     parser.add_argument("--input_moving", dest="input_moving",  help="input moving scan (.nii.gz)", default=None, required=True)
-    parser.add_argument("--output_warped", dest="output_warped",  help="output waroed scan (.nii.gz)", default=None, required=True)
+    parser.add_argument("--output_warped", dest="output_warped",  help="output warped scan (.nii.gz)", default=None, required=True)
     args = parser.parse_args()
 
     moving = nib.load(args.input_moving)
