@@ -3,10 +3,9 @@ from typing import Iterable
 
 import numpy as np
 import SimpleITK as sitk
-from helper_functions import resample_img, resample_moving_to_fixed
 
 from convexAdam.convex_adam_MIND import convex_adam_pt
-from convexAdam.convex_adam_utils import rescale_displacement_field
+from convexAdam.convex_adam_utils import resample_img, resample_moving_to_fixed
 
 
 def world_translation_to_index_translation(world_translation: Iterable[float], direction: Iterable[float]):

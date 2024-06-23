@@ -281,6 +281,33 @@ def validate_image(img: Union[torch.Tensor, np.ndarray, sitk.Image], dtype=float
     return img
 
 
+def resample_img(img: sitk.Image, spacing: tuple[float, float, float]) -> sitk.Image:
+    resample = sitk.ResampleImageFilter()
+    resample.SetOutputSpacing(spacing)
+    resample.SetSize([int(sz * spc / new_spc + 0.5) for sz, spc, new_spc in zip(img.GetSize(), img.GetSpacing(), spacing)])
+    resample.SetOutputDirection(img.GetDirection())
+    resample.SetOutputOrigin(img.GetOrigin())
+    resample.SetTransform(sitk.Transform())
+    resample.SetDefaultPixelValue(0)  # value for regions without source (zero-padding)
+    resample.SetInterpolator(sitk.sitkLinear)
+
+    return resample.Execute(img)
+
+
+def resample_moving_to_fixed(fixed: sitk.Image, moving: sitk.Image) -> sitk.Image:
+    """Resample moving image to the same grid as the fixed image"""
+    resample = sitk.ResampleImageFilter()
+    resample.SetOutputSpacing(fixed.GetSpacing())
+    resample.SetSize(fixed.GetSize())
+    resample.SetOutputDirection(fixed.GetDirection())
+    resample.SetOutputOrigin(fixed.GetOrigin())
+    resample.SetTransform(sitk.Transform())
+    resample.SetDefaultPixelValue(0)  # value for regions without source (zero-padding)
+    resample.SetInterpolator(sitk.sitkLinear)
+
+    return resample.Execute(moving)
+
+
 def rescale_displacement_field(
     displacement_field: np.ndarray,
     moving_image: sitk.Image,

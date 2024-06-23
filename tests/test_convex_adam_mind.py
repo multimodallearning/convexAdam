@@ -2,13 +2,14 @@ from pathlib import Path
 
 import numpy as np
 import SimpleITK as sitk
-from helper_functions import (resample_img, resample_moving_to_fixed,
-                              rotate_image_around_center_affine,
+from helper_functions import (rotate_image_around_center_affine,
                               rotate_image_around_center_resample)
 
 from convexAdam.apply_convex import apply_convex
 from convexAdam.convex_adam_MIND import convex_adam_pt
-from convexAdam.convex_adam_utils import rescale_displacement_field
+from convexAdam.convex_adam_utils import (resample_img,
+                                          resample_moving_to_fixed,
+                                          rescale_displacement_field)
 
 
 def test_convex_adam_identity(
