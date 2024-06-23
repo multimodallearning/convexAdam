@@ -4,41 +4,10 @@ from typing import Iterable
 import numpy as np
 import SimpleITK as sitk
 
-from convexAdam.convex_adam_MIND import convex_adam_pt
-from convexAdam.convex_adam_utils import resample_img, resample_moving_to_fixed
-
-
-def world_translation_to_index_translation(world_translation: Iterable[float], direction: Iterable[float]):
-    """
-    Convert a translation in world coordinates to a translation in index coordinates.
-
-    Args:
-        world_translation (x, y, z): The translation in world coordinates (mm).
-        direction: The direction of the image.
-    Returns:
-        index_translation (x, y, z): The translation in index coordinates (mm).
-    """
-    dimension = int(np.sqrt(len(direction)))
-    direction_matrix = np.array(direction).reshape((dimension, dimension))
-    index_translation = direction_matrix @ np.array(world_translation)
-    return index_translation
-
-
-def index_translation_to_world_translation(index_translation: Iterable[float], direction: Iterable[float]):
-    """
-    Convert a translation in index coordinates to a translation in world coordinates.
-    NOT YET TESTED
-
-    Args:
-        index_translation (x, y, z): The translation in index coordinates (mm).
-        direction: The direction of the image.
-    Returns:
-        world_translation (x, y, z): The translation in world coordinates (mm).
-    """
-    dimension = int(np.sqrt(len(direction)))
-    direction_matrix = np.array(direction).reshape((dimension, dimension))
-    world_translation = np.linalg.inv(direction_matrix) @ np.array(index_translation)
-    return world_translation
+from convexAdam.convex_adam_translation import (
+    apply_translation, convex_adam_translation,
+    index_translation_to_world_translation)
+from convexAdam.convex_adam_utils import resample_moving_to_fixed
 
 
 def translate_along_image_directions(image: sitk.Image, translation: Iterable[float]):
@@ -50,11 +19,11 @@ def translate_along_image_directions(image: sitk.Image, translation: Iterable[fl
         translation (x, y, z): The translation in the image directions (mm).
     """
     # Convert physical translation to index space (voxel units)
-    index_translation = world_translation_to_index_translation(translation, direction=image.GetDirection())
+    world_translation = index_translation_to_world_translation(translation, direction=image.GetDirection())
 
     # Create the transformation
     dimension = image.GetDimension()
-    transform = sitk.TranslationTransform(dimension, index_translation)
+    transform = sitk.TranslationTransform(dimension, world_translation)
 
     # Apply the transformation
     resampled_image = sitk.Resample(image, transform, sitk.sitkLinear, 0.0, image.GetPixelID())
@@ -74,22 +43,23 @@ def test_translation_precision(
 
     # move moving image a multiple of the voxel size
     spacing = np.array(moving_image.GetSpacing())
-    translation = spacing * 5
-    moving_image = translate_along_image_directions(moving_image, translation)
+    nvoxels = 5
+    translation = spacing * nvoxels
+    moving_image = translate_along_image_directions(image=moving_image, translation=translation)
     sitk.WriteImage(moving_image, str(output_dir / patient_id / f"{subject_id}_t2w_translation.mha"))
 
     # move moving image back
-    moving_image = translate_along_image_directions(moving_image, -translation)
+    moving_image = apply_translation(moving_image=moving_image, translation_ijk=-translation)
     sitk.WriteImage(moving_image, str(output_dir / patient_id / f"{subject_id}_t2w_translation_back.mha"))
 
     # compare images
+    moving_image = resample_moving_to_fixed(moving=moving_image, fixed=fixed_image)
     arr_fixed = sitk.GetArrayFromImage(fixed_image)
     arr_moving = sitk.GetArrayFromImage(moving_image)
 
     # crop (to avoid edge effects from translation)
-    crop = 5
-    arr_fixed = arr_fixed[crop:-crop, crop:-crop, crop:-crop]
-    arr_moving = arr_moving[crop:-crop, crop:-crop, crop:-crop]
+    arr_fixed = arr_fixed[nvoxels:-nvoxels, nvoxels:-nvoxels, nvoxels:-nvoxels]
+    arr_moving = arr_moving[nvoxels:-nvoxels, nvoxels:-nvoxels, nvoxels:-nvoxels]
 
     np.testing.assert_allclose(
         arr_fixed,
@@ -98,10 +68,8 @@ def test_translation_precision(
     )
 
 
-
 def test_convex_adam_translation(
     input_dir = Path("tests/input"),
-    output_dir = Path("tests/output"),
     subject_id = "10000_1000000",
     use_mask: bool = True,
 ):
@@ -113,41 +81,22 @@ def test_convex_adam_translation(
         segmentation = sitk.ReadImage(str(input_dir / patient_id / f"{subject_id}_prostate_seg.nii.gz"))
 
     # move moving image
-    moving_image = translate_along_image_directions(moving_image, [10, 10, 0])
-    sitk.WriteImage(moving_image, str(output_dir / patient_id / f"{subject_id}_t2w_translation.mha"))
+    translation = [10, 10, 0]
+    moving_image = translate_along_image_directions(moving_image, translation)
 
-    # resample images to specified spacing and the field of view of the fixed image
-    fixed_image_resampled = resample_img(fixed_image, spacing=(1.0, 1.0, 1.0))
-    moving_image_resampled = resample_moving_to_fixed(fixed_image_resampled, moving_image)
-
-    # run convex adam
-    displacementfield = convex_adam_pt(
-        img_fixed=fixed_image_resampled,
-        img_moving=moving_image_resampled,
+    # apply convex adam translation
+    translation_xyz, moving_image, _ = convex_adam_translation(
+        fixed_image=fixed_image,
+        moving_image=moving_image,
+        segmentation=segmentation,
     )
 
-    if use_mask:
-        # resample segmentation to the same spacing as the displacement field
-        segmentation = resample_moving_to_fixed(moving=segmentation, fixed=fixed_image_resampled)
-        seg_arr = sitk.GetArrayFromImage(segmentation)
-        seg_arr = (seg_arr > 0)  # above resampling is with linear interpolation, so we need to threshold
-
-    # convert displacement field to translation only
-    spacing_zyx = np.array(list(moving_image.GetSpacing())[::-1])
-    if use_mask:
-        translation_zyx = np.mean(displacementfield[seg_arr], axis=0)
-    else:
-        translation_zyx = np.mean(displacementfield, axis=(0, 1, 2))
-    translation_ijk = translation_zyx / spacing_zyx
-    translation_ijk_voxels = np.round(translation_ijk, decimals=0)
-    translation_ijk_mm = translation_ijk_voxels * spacing_zyx
-    translation_xyz = tuple(list(translation_ijk_mm[::-1]))
-
-    # apply translation to moving image
-    moving_image = translate_along_image_directions(moving_image, translation_xyz)
-
-    # save moved image
-    sitk.WriteImage(moving_image, str(output_dir / patient_id / f"{subject_id}_t2w_translation_warped.mha"))
+    # check translation
+    np.testing.assert_allclose(
+        -np.array(translation),
+        translation_xyz,
+        atol=1.0
+    )
 
 
 if __name__ == "__main__":
