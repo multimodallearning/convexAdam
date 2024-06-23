@@ -1,4 +1,3 @@
-import time
 import warnings
 from typing import Union
 
@@ -280,3 +279,48 @@ def validate_image(img: Union[torch.Tensor, np.ndarray, sitk.Image], dtype=float
         else:
             raise ValueError("Input image must be a torch.Tensor, a numpy.ndarray or a SimpleITK.Image")
     return img
+
+
+def rescale_displacement_field(
+    displacement_field: np.ndarray,
+    moving_image: sitk.Image,
+    fixed_image: sitk.Image,
+    fixed_image_resampled: sitk.Image,
+) -> np.ndarray:
+
+    # resample the displacement field to the physical space of the original moving image
+    channels_resampled = []
+    for i in range(3):
+        displacement_field_channel = sitk.GetImageFromArray(displacement_field[:, :, :, i])
+        displacement_field_channel.CopyInformation(fixed_image_resampled)
+
+        # set up the resampling filter
+        resampler = sitk.ResampleImageFilter()
+        resampler.SetReferenceImage(moving_image)
+        resampler.SetInterpolator(sitk.sitkLinear)
+
+        # apply resampling
+        displacement_field_resampled = resampler.Execute(displacement_field_channel)
+
+        # append to list of channels
+        channels_resampled.append(displacement_field_resampled)
+
+    # combine channels
+    displacement_field_resampled = sitk.JoinSeries(channels_resampled)
+    displacement_field_resampled = np.moveaxis(sitk.GetArrayFromImage(displacement_field_resampled), 0, -1)
+
+    # find the rotation between the direction of the moving image and the direction of the fixed image
+    fixed_direction = np.array(fixed_image.GetDirection()).reshape(3, 3)
+    moving_direction = np.array(moving_image.GetDirection()).reshape(3, 3)
+    rotation = np.dot(np.linalg.inv(fixed_direction), moving_direction)
+
+    # rotate the vectors in the displacement field (the z, y, x components are in the last dimension)
+    displacement_field_resampled = displacement_field_resampled[..., ::-1]  # make the order x, y, z
+    displacement_field_rotated = np.dot(displacement_field_resampled, rotation)
+    displacement_field_rotated = displacement_field_rotated[..., ::-1]  # make the order z, y, x
+
+    # adapt the displacement field to the original moving image, which has a different spacing
+    scaling_factor = np.array(fixed_image_resampled.GetSpacing()) / np.array(moving_image.GetSpacing())
+    displacement_field_rescaled = displacement_field_rotated * list(scaling_factor)[::-1]
+
+    return displacement_field_rescaled

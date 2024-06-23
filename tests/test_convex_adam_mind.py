@@ -8,6 +8,7 @@ from helper_functions import (resample_img, resample_moving_to_fixed,
 
 from convexAdam.apply_convex import apply_convex
 from convexAdam.convex_adam_MIND import convex_adam_pt
+from convexAdam.convex_adam_utils import rescale_displacement_field
 
 
 def test_convex_adam_identity(
@@ -230,40 +231,13 @@ def test_convex_adam_identity_rotated_and_shifted(
     output_dir.mkdir(exist_ok=True, parents=True)
     sitk.WriteImage(moving_image_resampled_warped, str(output_dir / patient_id / f"{subject_id}_moving_rotated_and_shifted_warped.mha"))
 
-    # apply displacement field to the moving image without resampling
-    channels_resampled = []
-    for i in range(3):
-        displacement_field_channel = sitk.GetImageFromArray(displacementfield[:, :, :, i])
-        displacement_field_channel.CopyInformation(fixed_image_resampled)
-
-        # set up the resampling filter
-        resampler = sitk.ResampleImageFilter()
-        resampler.SetReferenceImage(moving_image)
-        resampler.SetInterpolator(sitk.sitkLinear)
-
-        # apply resampling
-        displacement_field_resampled = resampler.Execute(displacement_field_channel)
-
-        # append to list of channels
-        channels_resampled.append(displacement_field_resampled)
-
-    # combine channels
-    displacement_field_resampled = sitk.JoinSeries(channels_resampled)
-    displacement_field_resampled = np.moveaxis(sitk.GetArrayFromImage(displacement_field_resampled), 0, -1)
-
-    # find the rotation between the direction of the moving image and the direction of the fixed image
-    fixed_direction = np.array(fixed_image.GetDirection()).reshape(3, 3)
-    moving_direction = np.array(moving_image.GetDirection()).reshape(3, 3)
-    rotation = np.dot(np.linalg.inv(fixed_direction), moving_direction)
-
-    # rotate the vectors in the displacement field (the z, y, x components are in the last dimension)
-    displacement_field_resampled = displacement_field_resampled[..., ::-1]  # make the order x, y, z
-    displacement_field_rotated = np.dot(displacement_field_resampled, rotation)
-    displacement_field_rotated = displacement_field_rotated[..., ::-1]  # make the order z, y, x
-
-    # adapt the displacement field to the original moving image, which has a different spacing
-    scaling_factor = np.array(fixed_image_resampled.GetSpacing()) / np.array(moving_image.GetSpacing())
-    displacement_field_rescaled = displacement_field_rotated * list(scaling_factor)[::-1]
+    # apply displacement field to the moving image without resampling the moving image
+    displacement_field_rescaled = rescale_displacement_field(
+        displacement_field=displacementfield,
+        moving_image=moving_image,
+        fixed_image=fixed_image,
+        fixed_image_resampled=fixed_image_resampled,
+    )
 
     moving_image_warped = apply_convex(
         disp=displacement_field_rescaled,
