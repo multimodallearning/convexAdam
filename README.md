@@ -1,5 +1,10 @@
 # convexAdam
 
+## Hyperparameter optimisation
+Journal paper extension currently under review
+
+![ConceptOverview](images/sc-graphic-2-2.pdf)
+
 Learn2Reg 2021 Submission
 ## Fast and accurate optimisation for registration with little learning
 
