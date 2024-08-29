@@ -136,3 +136,5 @@ dmypy.json
 
 # custom
 tests/output/
+tests/input/P-65591573/
+tests/output-expected/P-65591573/
