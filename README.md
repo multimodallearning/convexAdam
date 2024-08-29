@@ -1,5 +1,25 @@
 # convexAdam
 
+## Self-configuring hyperparameter optimisation
+Journal paper extension currently under review
+
+![ConceptOverview](images/sc_graphic2-2.png?raw=true "Selfconfiguring")
+
+To obtain an automatic estimate of the best choice of all various hyperparameter configurations, we propose a rank-based multi-metric two-stage search mechanism that leverages the fast dual optimisation employed in ConvexAdam to rapidly evaluate hundreds of settings. 
+
+We consider two scenarios: with and without available automatic semantic segmentation features using a pre-trained nnUNet. In the latter case we employ the handcraft MIND-SSC feature descriptor. For the former all infered train/test segmentations for the Learn2Reg tasks can be obtained at https://cloud.imi.uni-luebeck.de/s/cgXJfjDZNNgKRZe 
+
+Next we create a small config file for a new task that is similar to the Learn2Reg dataset.json and contains information on which training/validation pairs to use and how many (if any) labels are available for test/evaluation. 
+
+The entire self-configuring hyperparameter optimisation can usually be run in 1 hour or less and comprises two scripts that are executed after another.
+
+``convex_run_withconfig.py`` and ``adam_run_with_config.py`` 
+
+Each will test various settings, run online validation on the training/validation data and create a small log of all obtained scores that are ranked across those individual settings using a simplified version of Learn2Reg's evaluation (normalised per metric ranking w/o statistical significance and a geometric mean across metrics).
+
+Finally you can use infer_convexadam.py to apply the best parameter setting to the test data and refer to https://github.com/MDL-UzL/L2R/tree/main/evaluation for the official evaluation.
+
+
 Learn2Reg 2021 Submission
 ## Fast and accurate optimisation for registration with little learning
 
