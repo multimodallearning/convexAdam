@@ -184,7 +184,7 @@ def convex_adam_pt(
         if selected_smooth > 0:
             if selected_smooth % 2 == 0:
                 kernel_smooth = selected_smooth+1
-                raise Warning('selected_smooth should be an odd number, adding 1')
+                print('selected_smooth should be an odd number, adding 1')
 
             kernel_smooth = selected_smooth
             padding_smooth = kernel_smooth//2
