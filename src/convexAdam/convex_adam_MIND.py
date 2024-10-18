@@ -14,7 +14,7 @@ import torch.nn.functional as F
 from scipy.ndimage import distance_transform_edt as edt
 
 from convexAdam.convex_adam_utils import (MINDSSC, correlate, coupled_convex,
-                                          inverse_consistency)
+                                          inverse_consistency, validate_image)
 
 warnings.filterwarnings("ignore")
 
@@ -27,7 +27,9 @@ def extract_features(
     use_mask: bool,
     mask_fixed: torch.Tensor,
     mask_moving: torch.Tensor,
-) -> (torch.Tensor, torch.Tensor):
+    device: torch.device = torch.device("cuda"),
+    dtype: torch.dtype = torch.float16,
+) -> tuple[torch.Tensor, torch.Tensor]:
     """Extract MIND and/or semantic nnUNet features"""
 
     # MIND features
@@ -36,44 +38,32 @@ def extract_features(
 
         #replicate masking
         avg3 = nn.Sequential(nn.ReplicationPad3d(1),nn.AvgPool3d(3,stride=1))
-        avg3.cuda()
-        
-        mask = (avg3(mask_fixed.view(1,1,H,W,D).cuda())>0.9).float()
-        _,idx = edt((mask[0,0,::2,::2,::2]==0).squeeze().cpu().numpy(),return_indices=True)
-        fixed_r = F.interpolate((img_fixed[::2,::2,::2].cuda().reshape(-1)[idx[0]*D//2*W//2+idx[1]*D//2+idx[2]]).unsqueeze(0).unsqueeze(0),scale_factor=2,mode='trilinear')
-        fixed_r.view(-1)[mask.view(-1)!=0] = img_fixed.cuda().reshape(-1)[mask.view(-1)!=0]
+        avg3.to(device)
 
-        mask = (avg3(mask_moving.view(1,1,H,W,D).cuda())>0.9).float()
+        mask = (avg3(mask_fixed.view(1,1,H,W,D).to(device))>0.9).float()
         _,idx = edt((mask[0,0,::2,::2,::2]==0).squeeze().cpu().numpy(),return_indices=True)
-        moving_r = F.interpolate((img_moving[::2,::2,::2].cuda().reshape(-1)[idx[0]*D//2*W//2+idx[1]*D//2+idx[2]]).unsqueeze(0).unsqueeze(0),scale_factor=2,mode='trilinear')
-        moving_r.view(-1)[mask.view(-1)!=0] = img_moving.cuda().reshape(-1)[mask.view(-1)!=0]
+        fixed_r = F.interpolate((img_fixed[::2,::2,::2].to(device).reshape(-1)[idx[0]*D//2*W//2+idx[1]*D//2+idx[2]]).unsqueeze(0).unsqueeze(0),scale_factor=2,mode='trilinear')
+        fixed_r.view(-1)[mask.view(-1)!=0] = img_fixed.to(device).reshape(-1)[mask.view(-1)!=0]
 
-        features_fix = MINDSSC(fixed_r.cuda(),mind_r,mind_d).half()
-        features_mov = MINDSSC(moving_r.cuda(),mind_r,mind_d).half()
+        mask = (avg3(mask_moving.view(1,1,H,W,D).to(device))>0.9).float()
+        _,idx = edt((mask[0,0,::2,::2,::2]==0).squeeze().cpu().numpy(),return_indices=True)
+        moving_r = F.interpolate((img_moving[::2,::2,::2].to(device).reshape(-1)[idx[0]*D//2*W//2+idx[1]*D//2+idx[2]]).unsqueeze(0).unsqueeze(0),scale_factor=2,mode='trilinear')
+        moving_r.view(-1)[mask.view(-1)!=0] = img_moving.to(device).reshape(-1)[mask.view(-1)!=0]
+
+        features_fix = MINDSSC(fixed_r.to(device),mind_r,mind_d,device=device).to(dtype)
+        features_mov = MINDSSC(moving_r.to(device),mind_r,mind_d,device=device).to(dtype)
     else:
         img_fixed = img_fixed.unsqueeze(0).unsqueeze(0)
         img_moving = img_moving.unsqueeze(0).unsqueeze(0)
-        features_fix = MINDSSC(img_fixed.cuda(),mind_r,mind_d).half()
-        features_mov = MINDSSC(img_moving.cuda(),mind_r,mind_d).half()
-    
+        features_fix = MINDSSC(img_fixed.to(device),mind_r,mind_d,device=device).to(dtype)
+        features_mov = MINDSSC(img_moving.to(device),mind_r,mind_d,device=device).to(dtype)
+
     return features_fix, features_mov
 
 
-def validate_image(img: Union[torch.Tensor, np.ndarray, sitk.Image], dtype=float) -> torch.Tensor:
-    """Validate image input"""
-    if not isinstance(img, torch.Tensor):
-        if isinstance(img, sitk.Image):
-            img = sitk.GetArrayFromImage(img)
-        if isinstance(img, np.ndarray):
-            img = torch.from_numpy(img.astype(dtype))
-        else:
-            raise ValueError("Input image must be a torch.Tensor, a numpy.ndarray or a SimpleITK.Image")
-    return img
-
-
 def convex_adam_pt(
-    img_fixed: Union[torch.Tensor, np.ndarray, sitk.Image],
-    img_moving: Union[torch.Tensor, np.ndarray, sitk.Image],
+    img_fixed: Union[torch.Tensor, np.ndarray, sitk.Image, nib.Nifti1Image],
+    img_moving: Union[torch.Tensor, np.ndarray, sitk.Image, nib.Nifti1Image],
     mind_r: int = 1,
     mind_d: int = 2,
     lambda_weight: float = 1.25,
@@ -86,12 +76,19 @@ def convex_adam_pt(
     use_mask: bool = False,
     path_fixed_mask: Optional[Union[Path, str]] = None,
     path_moving_mask: Optional[Union[Path, str]] = None,
-) -> None:
+    dtype: torch.dtype = torch.float16,
+    verbose: bool = False,
+) -> np.ndarray:
     """Coupled convex optimisation with adam instance optimisation"""
     img_fixed = validate_image(img_fixed)
     img_moving = validate_image(img_moving)
     img_fixed = img_fixed.float()
     img_moving = img_moving.float()
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if dtype == torch.float16 and device == torch.device("cpu"):
+        print("Warning: float16 is not supported on CPU, using float32 instead")
+        dtype = torch.float32
 
     if use_mask:
         mask_fixed = torch.from_numpy(nib.load(path_fixed_mask).get_fdata()).float()
@@ -102,19 +99,21 @@ def convex_adam_pt(
 
     H, W, D = img_fixed.shape
 
-    torch.cuda.synchronize()
     t0 = time.time()
 
     # compute features and downsample (using average pooling)
     with torch.no_grad():      
-
-        features_fix, features_mov = extract_features(img_fixed=img_fixed,
-                                                      img_moving=img_moving,
-                                                      mind_r=mind_r,
-                                                      mind_d=mind_d,
-                                                      use_mask=use_mask,
-                                                      mask_fixed=mask_fixed,
-                                                      mask_moving=mask_moving)
+        features_fix, features_mov = extract_features(
+            img_fixed=img_fixed,
+            img_moving=img_moving,
+            mind_r=mind_r,
+            mind_d=mind_d,
+            use_mask=use_mask,
+            mask_fixed=mask_fixed,
+            mask_moving=mask_moving,
+            device=device,
+            dtype=dtype,
+        )
 
         features_fix_smooth = F.avg_pool3d(features_fix,grid_sp,stride=grid_sp)
         features_mov_smooth = F.avg_pool3d(features_mov,grid_sp,stride=grid_sp)
@@ -125,14 +124,14 @@ def convex_adam_pt(
     ssd,ssd_argmin = correlate(features_fix_smooth,features_mov_smooth,disp_hw,grid_sp,(H,W,D), n_ch)
 
     # provide auxiliary mesh grid
-    disp_mesh_t = F.affine_grid(disp_hw*torch.eye(3,4).cuda().half().unsqueeze(0),(1,1,disp_hw*2+1,disp_hw*2+1,disp_hw*2+1),align_corners=True).permute(0,4,1,2,3).reshape(3,-1,1)
-    
+    disp_mesh_t = F.affine_grid(disp_hw*torch.eye(3,4).to(device).to(dtype).unsqueeze(0),(1,1,disp_hw*2+1,disp_hw*2+1,disp_hw*2+1),align_corners=True).permute(0,4,1,2,3).reshape(3,-1,1)
+
     # perform coupled convex optimisation
     disp_soft = coupled_convex(ssd,ssd_argmin,disp_mesh_t,grid_sp,(H,W,D))
-    
+
     # if "ic" flag is set: make inverse consistent
     if ic:
-        scale = torch.tensor([H//grid_sp-1,W//grid_sp-1,D//grid_sp-1]).view(1,3,1,1,1).cuda().half()/2
+        scale = torch.tensor([H//grid_sp-1,W//grid_sp-1,D//grid_sp-1]).view(1,3,1,1,1).to(device).to(dtype)/2
 
         ssd_,ssd_argmin_ = correlate(features_mov_smooth,features_fix_smooth,disp_hw,grid_sp,(H,W,D), n_ch)
 
@@ -155,10 +154,10 @@ def convex_adam_pt(
 
         net = nn.Sequential(nn.Conv3d(3,1,(H//grid_sp_adam,W//grid_sp_adam,D//grid_sp_adam),bias=False))
         net[0].weight.data[:] = disp_lr.float().cpu().data/grid_sp_adam
-        net.cuda()
+        net.to(device)
         optimizer = torch.optim.Adam(net.parameters(), lr=1)
 
-        grid0 = F.affine_grid(torch.eye(3,4).unsqueeze(0).cuda(),(1,1,H//grid_sp_adam,W//grid_sp_adam,D//grid_sp_adam),align_corners=False)
+        grid0 = F.affine_grid(torch.eye(3,4).unsqueeze(0).to(device),(1,1,H//grid_sp_adam,W//grid_sp_adam,D//grid_sp_adam),align_corners=False)
 
         #run Adam optimisation with diffusion regularisation and B-spline smoothing
         for iter in range(selected_niter):
@@ -169,10 +168,10 @@ def convex_adam_pt(
             lambda_weight*((disp_sample[0,1:,:,:]-disp_sample[0,:-1,:,:])**2).mean()+\
             lambda_weight*((disp_sample[0,:,:,1:]-disp_sample[0,:,:,:-1])**2).mean()
 
-            scale = torch.tensor([(H//grid_sp_adam-1)/2,(W//grid_sp_adam-1)/2,(D//grid_sp_adam-1)/2]).cuda().unsqueeze(0)
-            grid_disp = grid0.view(-1,3).cuda().float()+((disp_sample.view(-1,3))/scale).flip(1).float()
+            scale = torch.tensor([(H//grid_sp_adam-1)/2,(W//grid_sp_adam-1)/2,(D//grid_sp_adam-1)/2]).to(device).unsqueeze(0)
+            grid_disp = grid0.view(-1,3).to(device).float()+((disp_sample.view(-1,3))/scale).flip(1).float()
 
-            patch_mov_sampled = F.grid_sample(patch_features_mov.float(),grid_disp.view(1,H//grid_sp_adam,W//grid_sp_adam,D//grid_sp_adam,3).cuda(),align_corners=False,mode='bilinear')
+            patch_mov_sampled = F.grid_sample(patch_features_mov.float(),grid_disp.view(1,H//grid_sp_adam,W//grid_sp_adam,D//grid_sp_adam,3).to(device),align_corners=False,mode='bilinear')
 
             sampled_cost = (patch_mov_sampled-patch_features_fix).pow(2).mean(1)*12
             loss = sampled_cost.mean()
@@ -182,24 +181,23 @@ def convex_adam_pt(
         fitted_grid = disp_sample.detach().permute(0,4,1,2,3)
         disp_hr = F.interpolate(fitted_grid*grid_sp_adam,size=(H,W,D),mode='trilinear',align_corners=False)
 
-        if selected_smooth == 5:
-            kernel_smooth = 5
+        if selected_smooth > 0:
+            if selected_smooth % 2 == 0:
+                kernel_smooth = selected_smooth+1
+                raise Warning('selected_smooth should be an odd number, adding 1')
+
+            kernel_smooth = selected_smooth
             padding_smooth = kernel_smooth//2
             disp_hr = F.avg_pool3d(F.avg_pool3d(F.avg_pool3d(disp_hr,kernel_smooth,padding=padding_smooth,stride=1),kernel_smooth,padding=padding_smooth,stride=1),kernel_smooth,padding=padding_smooth,stride=1)
 
-        if selected_smooth == 3:
-            kernel_smooth = 3
-            padding_smooth = kernel_smooth//2
-            disp_hr = F.avg_pool3d(F.avg_pool3d(F.avg_pool3d(disp_hr,kernel_smooth,padding=padding_smooth,stride=1),kernel_smooth,padding=padding_smooth,stride=1),kernel_smooth,padding=padding_smooth,stride=1)
-
-    torch.cuda.synchronize()
     t1 = time.time()
     case_time = t1-t0
-    print('case time: ', case_time)
+    if verbose:
+        print(f'case time: {case_time}')
 
-    x = disp_hr[0,0,:,:,:].cpu().half().data.numpy()
-    y = disp_hr[0,1,:,:,:].cpu().half().data.numpy()
-    z = disp_hr[0,2,:,:,:].cpu().half().data.numpy()
+    x = disp_hr[0,0,:,:,:].cpu().to(dtype).data.numpy()
+    y = disp_hr[0,1,:,:,:].cpu().to(dtype).data.numpy()
+    z = disp_hr[0,2,:,:,:].cpu().to(dtype).data.numpy()
     displacements = np.stack((x,y,z),3).astype(float)
     return displacements
 
@@ -220,6 +218,7 @@ def convex_adam(
     path_fixed_mask: Optional[Union[Path, str]] = None,
     path_moving_mask: Optional[Union[Path, str]] = None,
     result_path: Union[Path, str] = './',
+    verbose: bool = False,
 ) -> None:
     """Coupled convex optimisation with adam instance optimisation"""
 
@@ -241,6 +240,7 @@ def convex_adam(
         use_mask=use_mask,
         path_fixed_mask=path_fixed_mask,
         path_moving_mask=path_moving_mask,
+        verbose=verbose,
     )
 
     affine = nib.load(path_img_fixed).affine
