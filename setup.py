@@ -5,7 +5,7 @@ if __name__ == '__main__':
         long_description = fh.read()
 
     setuptools.setup(
-        version='0.1',
+        version='0.2.0',
         author_email='heinrich@imi.uni-luebeck.de',
         long_description=long_description,
         long_description_content_type="text/markdown",
