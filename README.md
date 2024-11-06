@@ -13,13 +13,14 @@
 
 ## :floppy_disk: Installation
 
+You can run ConvexAdam out of the box with
 ```
 gh repo clone multimodallearning/convexAdam 
 pip install convexAdam
 python convexAdam/src/convexAdam/convex_adam_MIND.py -f fixed_image.nii.gz -m moving_image.nii.gz
 ````
 
-## Self-configuring hyperparameter optimisation
+## :bar_chart: Self-configuring hyperparameter optimisation
 
 ![ConceptOverview](images/sc_graphic2-2.png?raw=true "Selfconfiguring")
 
@@ -37,7 +38,7 @@ Each will test various settings, run online validation on the training/validatio
 
 Finally you can use infer_convexadam.py to apply the best parameter setting to the test data and refer to https://github.com/MDL-UzL/L2R/tree/main/evaluation for the official evaluation.
 
-## Citations
+## :books: Citations
 
 If you find our work helpful, please cite
 
