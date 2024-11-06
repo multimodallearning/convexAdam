@@ -1,5 +1,6 @@
 # convexAdam
 
+News:
 * :zap: Our [Journal paper extension](https://ieeexplore.ieee.org/abstract/document/10681158) got accepted to IEEE TMI! :tada:
 * :zap: Easy installation with pip available!
 
