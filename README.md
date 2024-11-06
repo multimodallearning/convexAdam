@@ -7,7 +7,7 @@
 ![MethodOverview](images/method_overview.png?raw=true "Selfconfiguring")
 
 
-## :star: ConvexAdam ranks first for the [Learn2Reg Challenge](https://learn2reg.grand-challenge.org/) 2020 and 2021 Datasets!
+## :star: ConvexAdam ranks first for the [Learn2Reg Challenge](https://learn2reg.grand-challenge.org/) Datasets! :star:
 
 ![MethodOverview](images/l2r_m.png?raw=true "Learn2RegResults")
 
