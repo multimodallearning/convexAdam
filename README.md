@@ -1,7 +1,25 @@
 # convexAdam
 
+* :zap: Our [Journal paper extension](https://ieeexplore.ieee.org/abstract/document/10681158) got accepted to IEEE TMI! :tada:
+* :zap: Easy installation with pip available!
+
+## Fast and accurate optimisation for registration with little learning
+![MethodOverview](images/method_overview.png?raw=true "Selfconfiguring")
+
+
+## :star: ConvexAdam ranks first for the [Learn2Reg Challenge](https://learn2reg.grand-challenge.org/) 2020 and 2021 Datasets!
+
+![MethodOverview](images/l2r_m.png?raw=true "Learn2RegResults")
+
+## Installation
+
+```
+gh repo clone multimodallearning/convexAdam 
+pip install convexAdam
+python convexAdam/src/convexAdam/convex_adam_MIND.py -f fixed_image.nii.gz -m moving_image.nii.gz
+````
+
 ## Self-configuring hyperparameter optimisation
-Journal paper extension currently under review
 
 ![ConceptOverview](images/sc_graphic2-2.png?raw=true "Selfconfiguring")
 
@@ -19,29 +37,35 @@ Each will test various settings, run online validation on the training/validatio
 
 Finally you can use infer_convexadam.py to apply the best parameter setting to the test data and refer to https://github.com/MDL-UzL/L2R/tree/main/evaluation for the official evaluation.
 
+## Citations
 
-Learn2Reg 2021 Submission
-## Fast and accurate optimisation for registration with little learning
+If you find our work helpful, please cite
 
-![Slide1](images/L2R_2021_ConvexAdam.002.jpeg?raw=true "Coupled Convex")
-![Slide2](images/L2R_2021_ConvexAdam.003.jpeg?raw=true "Coupled Convex")
-![Slide3](images/L2R_2021_ConvexAdam.004.jpeg?raw=true "Coupled Convex")
-
-Please see details in our paper and if you use the code, please cite the following:
-Siebert, H., Hansen, L., Heinrich, M.P. (2022). Fast 3D Registration with Accurate Optimisation and Little Learning for Learn2Reg 2021. In: Aubreville, M., Zimmerer, D., Heinrich, M. (eds) Biomedical Image Registration, Domain Generalisation and Out-of-Distribution Analysis. MICCAI 2021. Lecture Notes in Computer Science(), vol 13166. Springer, Cham. https://doi.org/10.1007/978-3-030-97281-3_25
-
-and
-
-Heinrich, M.P., Papież, B.W., Schnabel, J.A., Handels, H. (2014). Non-parametric Discrete Registration with Convex Optimisation. In: Ourselin, S., Modat, M. (eds) Biomedical Image Registration. WBIR 2014. Lecture Notes in Computer Science, vol 8545. Springer, Cham. https://doi.org/10.1007/978-3-319-08554-8_6
-
-
-
-## Excellent results on Learn2Reg 2021 challenge
-- for multimodal CT/MR registration (Task1) 
-- intra-patient lung CT alignment (Task2)
-- and inter-patient whole brain MRI deformations (Task3)
-[Challenge Website](https://learn2reg.grand-challenge.org)
-
-![Slide4](images/L2R_2021_ConvexAdam.005.jpeg?raw=true "Coupled Convex")
-
-![Results](images/l2r2021_convexAdam.png?raw=true "Results")
+```
+%convexAdam + Hyperparameter Optimisation TMI
+@article{siebert2024convexadam,
+  title={ConvexAdam: Self-Configuring Dual-Optimisation-Based 3D Multitask Medical Image Registration},
+  author={Siebert, Hanna and Gro{\ss}br{\"o}hmer, Christoph and Hansen, Lasse and Heinrich, Mattias P},
+  journal={IEEE Transactions on Medical Imaging},
+  year={2024},
+  publisher={IEEE}
+}
+% Original Learn2Reg2021 Submission
+@inproceedings{siebert2021fast,
+  title={Fast 3D registration with accurate optimisation and little learning for Learn2Reg 2021},
+  author={Siebert, Hanna and Hansen, Lasse and Heinrich, Mattias P},
+  booktitle={International Conference on Medical Image Computing and Computer-Assisted Intervention},
+  pages={174--179},
+  year={2021},
+  organization={Springer}
+}
+% Registration with Convex Optimisation
+@inproceedings{heinrich2014non,
+  title={Non-parametric discrete registration with convex optimisation},
+  author={Heinrich, Mattias P and Papie{\.z}, Bartlomiej W and Schnabel, Julia A and Handels, Heinz},
+  booktitle={Biomedical Image Registration: 6th International Workshop, WBIR 2014, London, UK, July 7-8, 2014. Proceedings 6},
+  pages={51--61},
+  year={2014},
+  organization={Springer}
+}
+```
