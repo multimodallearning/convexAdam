@@ -40,7 +40,7 @@ Finally you can use infer_convexadam.py to apply the best parameter setting to t
 
 ## :books: Citations
 
-If you find our work helpful, please cite
+If you find our work helpful, please cite:
 
 ```
 %convexAdam + Hyperparameter Optimisation TMI
