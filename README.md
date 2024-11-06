@@ -3,7 +3,7 @@
 * :zap: Our [Journal paper extension](https://ieeexplore.ieee.org/abstract/document/10681158) got accepted to IEEE TMI! :tada:
 * :zap: Easy installation with pip available!
 
-## Fast and accurate optimisation for registration with little learning
+## :zap: Fast and accurate optimisation for registration with little learning
 ![MethodOverview](images/method_overview.png?raw=true "Selfconfiguring")
 
 
@@ -11,7 +11,7 @@
 
 ![MethodOverview](images/l2r_m.png?raw=true "Learn2RegResults")
 
-## Installation
+## :floppy_disk: Installation
 
 ```
 gh repo clone multimodallearning/convexAdam 
