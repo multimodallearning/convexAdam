@@ -44,7 +44,7 @@ def MINDSSC(img, radius=2, dilation=2):
     dist = pdist_squared(six_neighbourhood.t().unsqueeze(0)).squeeze(0)
     
     # define comparison mask
-    x, y = torch.meshgrid(torch.arange(6), torch.arange(6),indexing='ij')
+    x, y = torch.meshgrid(torch.arange(6), torch.arange(6), indexing='ij')
     mask = ((x > y).view(-1) & (dist == 2).view(-1))
     
     # build kernel
@@ -302,7 +302,7 @@ for ii,nu in enumerate((1,2,3,4,5,6,7,8,12,13,14,15,16,17,18,19,21,23,24,25,26,2
     #print(img_fixed.shape)
     seg_moving = torch.from_numpy(nib.load('L2R_Task01/Case'+str(nu)+'-MRI-landmarks.nii.gz').get_fdata()).short().reshape(-1).cuda()
     seg_fixed = torch.from_numpy(nib.load('L2R_Task01/Case'+str(nu)+'-US-landmarks.nii.gz').get_fdata()).short().reshape(-1).cuda()
-    mesh = torch.stack(torch.meshgrid((torch.arange(256),torch.arange(256),torch.arange(288)))).reshape(3,-1).float().cuda()
+    mesh = torch.stack(torch.meshgrid((torch.arange(256),torch.arange(256),torch.arange(288)), indexing='ij')).reshape(3,-1).float().cuda()
     coord_fixed = torch.empty(0,3)
     coord_moving = torch.empty(0,3)
     affine = F.affine_grid(torch.eye(3,4).cuda().unsqueeze(0),(1,1,H,W,D),align_corners=False)

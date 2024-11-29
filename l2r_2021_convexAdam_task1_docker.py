@@ -69,7 +69,7 @@ def convert_crop_field(case,fix_affine_disp_p):
 
     fix_grid = torch.stack(torch.meshgrid(torch.arange(fix_shape[0]).cuda(),
                                           torch.arange(fix_shape[1]).cuda(),
-                                          torch.arange(fix_shape[2]).cuda()), dim=3).view(1,-1,3)
+                                          torch.arange(fix_shape[2]).cuda(), indexing='ij'), dim=3).view(1,-1,3)
 
     fix_grid_affine = torch.matmul(fix_affine.inverse().cuda(), torch.cat([fix_grid[0], torch.ones(fix_grid.shape[1], 1).cuda()], dim=1).t()).t()[:,:3].unsqueeze(0)
 
@@ -390,7 +390,7 @@ for nu in range(1,16,2):#14,16
     fix_spacing = torch.tensor(nib.load(folder+'TCIA'+str(nu).zfill(2)+'_img_fixed.nii.gz').header.get_zooms(), device=device)
     mov_spacing = torch.tensor(nib.load(folder+'TCIA'+str(nu).zfill(2)+'_img_moving.nii.gz').header.get_zooms(), device=device)
     img_fix = img_fixed.unsqueeze(0).unsqueeze(0)
-    img_fix_grid = torch.stack(torch.meshgrid(torch.arange(img_fix.shape[2], device=device),torch.arange(img_fix.shape[3], device=device),torch.arange(img_fix.shape[4], device=device)), dim=3).unsqueeze(0)
+    img_fix_grid = torch.stack(torch.meshgrid(torch.arange(img_fix.shape[2], device=device),torch.arange(img_fix.shape[3], device=device),torch.arange(img_fix.shape[4], device=device), indexing='ij'), dim=3).unsqueeze(0)
     img_mov_warped_grid = img_fix_grid + disp_smooth.permute(0,2,3,4,1)
     img_fix_grid_p = img_fix_grid * fix_spacing
     img_mov_warped_grid_p = img_mov_warped_grid * mov_spacing

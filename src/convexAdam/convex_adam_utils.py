@@ -39,7 +39,7 @@ def MINDSSC(img, radius=2, dilation=2, device='cuda'):
     dist = pdist_squared(six_neighbourhood.t().unsqueeze(0)).squeeze(0)
     
     # define comparison mask
-    x, y = torch.meshgrid(torch.arange(6), torch.arange(6))
+    x, y = torch.meshgrid(torch.arange(6), torch.arange(6), indexing='ij')
     mask = ((x > y).view(-1) & (dist == 2).view(-1))
     
     # build kernel
