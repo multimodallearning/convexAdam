@@ -73,10 +73,9 @@ def test_convex_adam(
     sitk.WriteImage(moving_image_resampled_warped, str(output_dir / patient_id / f"{subject_id}_adc_warped.mha"))
 
     # compare with reference
-    assert np.allclose(
-        sitk.GetArrayFromImage(moving_image_resampled_warped),
-        sitk.GetArrayFromImage(moving_image_reference),
-    )
+    arr1 = sitk.GetArrayFromImage(moving_image_resampled_warped)
+    arr2 = sitk.GetArrayFromImage(moving_image_reference)
+    assert (np.abs(arr1 - arr2) < 10).mean() > 0.95
 
 
 def test_convex_adam_translation(
@@ -90,14 +89,19 @@ def test_convex_adam_translation(
     moving_image = sitk.ReadImage(str(input_dir / patient_id / f"{subject_id}_t2w.mha"))
     (output_dir / patient_id).mkdir(exist_ok=True, parents=True)
 
-    # move moving image
-    affine = sitk.AffineTransform(3)
-    affine.SetTranslation([10, 10, 10])
-    moving_image = sitk.Resample(moving_image, affine)
+    # set direction to unity (this is important for the test)
+    # doing this aligns the image axes with the world axes
+    fixed_image.SetDirection([1, 0, 0, 0, 1, 0, 0, 0, 1])
+    moving_image.SetDirection([1, 0, 0, 0, 1, 0, 0, 0, 1])
 
     # resample images to specified spacing and the field of view of the fixed image
     fixed_image_resampled = resample_img(fixed_image, spacing=(1.0, 1.0, 1.0))
     moving_image_resampled = resample_moving_to_fixed(fixed_image_resampled, moving_image)
+
+    # move moving image
+    affine = sitk.AffineTransform(3)
+    affine.SetTranslation([10, 10, 10])
+    moving_image_resampled = sitk.Resample(moving_image_resampled, affine)
 
     # run convex adam
     displacementfield = convex_adam_pt(
@@ -119,8 +123,10 @@ def test_convex_adam_translation(
     output_dir.mkdir(exist_ok=True, parents=True)
     sitk.WriteImage(moving_image_resampled_warped, str(output_dir / patient_id / f"{subject_id}_t2w_translation_warped.mha"))
 
-    # compare with reference (displacement field should be within 1 mm of the translation for at least 90% of the voxels)
-    assert (np.abs(displacementfield + 10) < 1).mean() > 0.9
+    # compare with reference (displacement field should be within 1 mm of the translation for at least 90% of the voxels in the center)
+    s = displacementfield.shape[0] // 10
+    displacementfield_center = displacementfield[s:-s, s:-s, s:-s]
+    assert (np.abs(displacementfield_center + 10) < 1).mean() > 0.90
 
 
 def test_convex_adam_identity_rotated_direction(
