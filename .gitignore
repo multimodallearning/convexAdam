@@ -135,6 +135,7 @@ dmypy.json
 .DS_Store
 
 # custom
-tests/output/
+tests/output/*
+!tests/output/.gitkeep
 tests/input/P-65591573/
 tests/output-expected/P-65591573/
