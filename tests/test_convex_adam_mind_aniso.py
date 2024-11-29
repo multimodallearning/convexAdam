@@ -21,6 +21,7 @@ def test_convex_adam_rotated_and_shifted_anisotropic(
     patient_id = subject_id.split("_")[0]
     fixed_image = sitk.ReadImage(str(input_dir / patient_id / f"{subject_id}_t2w.mha"))
     moving_image = sitk.ReadImage(str(input_dir / patient_id / f"{subject_id}_t2w.mha"))
+    (output_dir / patient_id).mkdir(exist_ok=True, parents=True)
 
     # translate the moving image
     translation = 20
@@ -91,6 +92,7 @@ def test_convex_adam_anisotropic(
     patient_id = subject_id.split("_")[0]
     fixed_image = sitk.ReadImage(str(input_dir / patient_id / f"{subject_id}_t2w.mha"))
     moving_image = sitk.ReadImage(str(input_dir / patient_id / f"{subject_id}_adc.mha"))
+    (output_dir / patient_id).mkdir(exist_ok=True, parents=True)
 
     # resample images to specified spacing and the field of view of the fixed image
     fixed_image_resampled = resample_img(fixed_image, spacing=(1.0, 1.0, 1.0))

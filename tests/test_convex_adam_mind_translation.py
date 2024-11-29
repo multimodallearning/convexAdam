@@ -40,6 +40,7 @@ def test_translation_precision(
     patient_id = subject_id.split("_")[0]
     fixed_image = sitk.ReadImage(str(input_dir / patient_id / f"{subject_id}_t2w.mha"))
     moving_image = sitk.ReadImage(str(input_dir / patient_id / f"{subject_id}_t2w.mha"))
+    (output_dir / patient_id).mkdir(exist_ok=True, parents=True)
 
     # move moving image a multiple of the voxel size
     spacing = np.array(moving_image.GetSpacing())
