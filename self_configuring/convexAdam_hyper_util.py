@@ -6,26 +6,19 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from scipy.ndimage.filters import gaussian_filter
+from scipy.ndimage import gaussian_filter
 
 warnings.filterwarnings("ignore")
-import os
-
-import argparse
-import os
 import time
 import warnings
-from pathlib import Path
-from typing import Optional, Union
 
-import nibabel as nib
+import cupy
 import numpy as np
-import SimpleITK as sitk
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from scipy.ndimage import distance_transform_edt as edt
-import cupy
+
 #from cupyx.scipy.ndimage import distance_transform_edt
 
 #from convexAdam.convex_adam_utils import (MINDSSC, correlate, coupled_convex,
@@ -427,7 +420,6 @@ def crop_to_bbox(image, bbox):
 
 
 import numpy as np
-
 
 
 def filter1D(img, weight, dim, padding_mode='replicate'):

@@ -1,23 +1,23 @@
+import json
+import sys
 import time
 import warnings
+
 import nibabel as nib
-import json
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from scipy.ndimage.filters import gaussian_filter
-import sys
+
 warnings.filterwarnings("ignore")
 import os
 
-import cupy
-from cupyx.scipy.ndimage import distance_transform_edt
+from convexAdam_hyper_util import (GaussianSmoothing, correlate,
+                                   coupled_convex, extract_features_nnunet,
+                                   inverse_consistency, kovesi_spline)
 from tqdm.auto import trange
 
-from convexAdam_hyper_util import MINDSSC, correlate, coupled_convex, inverse_consistency, dice_coeff,extract_features, sort_rank, jacobian_determinant_3d, kovesi_spline, GaussianSmoothing, gpu_usage, extract_features_nnunet,cupy_hd95
 
-            
 def get_data_train(topk,HWD,f_predict,f_gt):
     l2r_base_folder = './'
     print('reading test data')

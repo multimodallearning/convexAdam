@@ -7,7 +7,7 @@ import SimpleITK as sitk
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from scipy.ndimage.filters import gaussian_filter
+from scipy.ndimage import gaussian_filter
 
 warnings.filterwarnings("ignore")
 

@@ -1,22 +1,22 @@
+import sys
 import time
 import warnings
-import nibabel as nib
 
-import numpy as np
+import nibabel as nib
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
-from scipy.ndimage.filters import gaussian_filter
-import sys
+
 warnings.filterwarnings("ignore")
-import os
 import json
-import cupy
-from cupyx.scipy.ndimage import distance_transform_edt
+import os
+
+from convexAdam_hyper_util import (correlate, coupled_convex, cupy_hd95,
+                                   dice_coeff, extract_features_nnunet,
+                                   inverse_consistency,
+                                   jacobian_determinant_3d, sort_rank)
 from tqdm.auto import trange
 
-from convexAdam_hyper_util import MINDSSC, correlate, coupled_convex, inverse_consistency, dice_coeff,extract_features, sort_rank, jacobian_determinant_3d, kovesi_spline, GaussianSmoothing, gpu_usage, extract_features_nnunet,cupy_hd95
-            
+
 def get_data_train(topk,HWD,f_predict,f_gt):
     l2r_base_folder = './'
 #~/storage/staff/christophgrossbroeh/data/Learn2Reg/Learn2Reg_Dataset_release_v1.1
