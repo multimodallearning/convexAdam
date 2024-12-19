@@ -1,9 +1,11 @@
 from pathlib import Path
+import torch
 
 import numpy as np
 import SimpleITK as sitk
 from helper_functions import (rotate_image_around_center_affine,
-                              rotate_image_around_center_resample)
+                              rotate_image_around_center_resample,
+                              ssim3D)
 
 from convexAdam.apply_convex import apply_convex
 from convexAdam.convex_adam_MIND import convex_adam_pt
@@ -11,6 +13,11 @@ from convexAdam.convex_adam_utils import (resample_img,
                                           resample_moving_to_fixed,
                                           rescale_displacement_field)
 
+
+##For testing
+torch.backends.cuda.matmul.allow_tf32 = False 
+torch.backends.cudnn.deterministic = True
+torch.use_deterministic_algorithms(True, warn_only=True)
 
 def test_convex_adam_identity(
     input_dir = Path("tests/input"),
@@ -72,11 +79,10 @@ def test_convex_adam(
     output_dir.mkdir(exist_ok=True, parents=True)
     sitk.WriteImage(moving_image_resampled_warped, str(output_dir / patient_id / f"{subject_id}_adc_warped.mha"))
 
-    # compare with reference
-    arr1 = sitk.GetArrayFromImage(moving_image_resampled_warped)
-    arr2 = sitk.GetArrayFromImage(moving_image_reference)
-    assert (np.abs(arr1 - arr2) < 10).mean() > 0.95
-
+    # compare results with SSIM metric
+    arr1 = torch.from_numpy(sitk.GetArrayFromImage(moving_image_resampled_warped)[np.newaxis, np.newaxis, ...])
+    arr2 = torch.from_numpy(sitk.GetArrayFromImage(moving_image_reference)[np.newaxis, np.newaxis, ...])
+    assert ssim3D(arr1, arr2) > 0.95
 
 def test_convex_adam_translation(
     input_dir = Path("tests/input"),
