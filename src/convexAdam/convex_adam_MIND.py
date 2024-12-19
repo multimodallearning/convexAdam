@@ -78,14 +78,14 @@ def convex_adam_pt(
     path_moving_mask: Optional[Union[Path, str]] = None,
     dtype: torch.dtype = torch.float16,
     verbose: bool = False,
+    device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 ) -> np.ndarray:
     """Coupled convex optimisation with adam instance optimisation"""
     img_fixed = validate_image(img_fixed)
     img_moving = validate_image(img_moving)
     img_fixed = img_fixed.float()
     img_moving = img_moving.float()
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
     if dtype == torch.float16 and device == torch.device("cpu"):
         print("Warning: float16 is not supported on CPU, using float32 instead")
         dtype = torch.float32
