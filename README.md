@@ -16,9 +16,7 @@ News:
 
 You can run ConvexAdam out of the box with
 ```
-gh repo clone multimodallearning/convexAdam 
 pip install convexAdam
-python convexAdam/src/convexAdam/convex_adam_MIND.py -f fixed_image.nii.gz -m moving_image.nii.gz
 ````
 
 ## :bar_chart: Self-configuring hyperparameter optimisation
